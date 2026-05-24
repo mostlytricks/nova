@@ -1,0 +1,8 @@
+# demos
+
+> Example namespace — shows how to group a set of related docs under one llms.txt.
+
+## Overview
+
+- [Overview](/api/entries/get?name=demos/overview.md): What this namespace is for
+- [Quick reference](/api/entries/get?name=demos/quick-ref.md): Cheat sheet
