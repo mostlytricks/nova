@@ -18,9 +18,14 @@ pnpm docs-import fetch-clean <url>
 
 pnpm docs-import openapi <spec-url>
   → JSON: { info, servers, securitySchemes, tags: [{ name, description, endpoints: [...] }] }
+
+pnpm docs-import split <namespace> [--by sections|path|manual] [--dry-run]
+  → creates focused sibling namespaces like <namespace>--guides plus <namespace>--split
 ```
 
-Your job is to **orchestrate these three commands and decide editorial things** (entry grouping, titles, summaries) — not to re-implement fetching or HTML parsing. If a step fails, log it and continue with what you have.
+Your job is to **orchestrate these commands and decide editorial things** (entry grouping, titles, summaries, and whether a large namespace should be split) — not to re-implement fetching or HTML parsing. If a step fails, log it and continue with what you have.
+
+After importing a large namespace, optionally run `pnpm docs-import split <namespace> --dry-run`. If the manifest is too large for agents to use well, apply the split with `--by sections` for well-structured manifests or `--by path` for one large flat `## Pages` section. Splitting never edits the original namespace; it writes sibling namespaces and a `<namespace>--split` index.
 
 ---
 

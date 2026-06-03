@@ -6,14 +6,19 @@
  *   probe <url>             Detect source type + return JSON plan
  *   fetch-clean <url>       Fetch a single URL and print clean markdown to stdout
  *   openapi <spec-url>      Parse an OpenAPI/Swagger spec into structured JSON grouped by tag
+ *   split <namespace>       Split a namespace into focused sibling namespaces
  *
- * Output is always JSON or markdown on stdout. Errors go to stderr; exit codes are
- * 0 (ok), 1 (failed sanity / not found), 2 (bad usage).
+ * Output goes to stdout in the command-specific format. Errors go to stderr;
+ * exit codes are 0 (ok), 1 (failed sanity / not found), 2 (bad usage).
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { JSDOM } from 'jsdom';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { fetchMarkdown } from '../fetcher/fetch.js';
+import { OWN_DIR } from '../config.js';
+import { parseLlmsTxt, serializeLlmsTxt, type LlmsDoc, type LlmsLink } from '../parser.js';
 
 /* ---------- shared helpers ---------- */
 
@@ -405,6 +410,367 @@ async function runOpenapi(rawUrl: string): Promise<unknown> {
   };
 }
 
+/* ---------- split ---------- */
+
+type SplitStrategy = 'sections' | 'path' | 'manual';
+
+interface SplitOptions {
+  by: SplitStrategy;
+  dryRun: boolean;
+  planPath: string | null;
+}
+
+interface SplitLink {
+  link: LlmsLink;
+  sourceEntry: string | null;
+}
+
+interface SplitGroup {
+  slug: string;
+  title: string;
+  links: SplitLink[];
+}
+
+interface ManualPlan {
+  namespace?: string;
+  strategy?: string;
+  groups?: {
+    slug: string;
+    title: string;
+    linkUrls: string[];
+  }[];
+}
+
+const RESERVED_SPLIT_SLUGS = new Set(['api', 'static', 'assets', 'llms.txt']);
+const NAMESPACE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+
+function parseSplitOptions(args: string[]): { namespace: string; options: SplitOptions } {
+  const namespace = args[0];
+  if (!namespace) die('split requires a namespace');
+  const options: SplitOptions = { by: 'sections', dryRun: false, planPath: null };
+  for (let i = 1; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--dry-run') {
+      options.dryRun = true;
+    } else if (arg === '--by') {
+      const by = args[++i];
+      if (by !== 'sections' && by !== 'path' && by !== 'manual') {
+        die('--by must be one of: sections, path, manual');
+      }
+      options.by = by;
+    } else if (arg === '--plan') {
+      const planPath = args[++i];
+      if (!planPath) die('--plan requires a file path');
+      options.planPath = planPath;
+      options.by = 'manual';
+    } else {
+      die(`unknown split option: ${arg}`);
+    }
+  }
+  if (options.planPath && options.dryRun) {
+    die('split does not support --plan with --dry-run');
+  }
+  return { namespace, options };
+}
+
+function validateExistingNamespace(name: string): void {
+  if (!NAMESPACE_NAME_RE.test(name)) die(`invalid namespace: ${name}`);
+  if (name.includes('--')) die('split-of-a-split is not supported');
+  const dir = path.join(OWN_DIR, name);
+  const llmsPath = path.join(dir, 'llms.txt');
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+    die(`namespace not found: ${name}`, 1);
+  }
+  if (!fs.existsSync(llmsPath)) {
+    die(`namespace is missing llms.txt: ${name}`, 1);
+  }
+}
+
+function slugify(input: string): string {
+  const slug = input
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return slug || 'docs';
+}
+
+function uniqueSlug(base: string, used: Set<string>): string {
+  let slug = slugify(base);
+  if (RESERVED_SPLIT_SLUGS.has(slug)) slug = `${slug}-1`;
+  let candidate = slug;
+  let n = 2;
+  while (used.has(candidate) || RESERVED_SPLIT_SLUGS.has(candidate)) {
+    candidate = `${slug}-${n++}`;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+function ownEntryFromUrl(namespace: string, url: string): string | null {
+  let raw = url;
+  try {
+    const parsed = new URL(url, 'http://local');
+    if (parsed.pathname !== '/api/entries/get') return null;
+    raw = parsed.searchParams.get('name') ?? '';
+  } catch {
+    return null;
+  }
+  if (!raw.startsWith(`${namespace}/`) || !raw.endsWith('.md') || raw.includes('..')) return null;
+  if (!/^[a-zA-Z0-9_\-./]+$/.test(raw)) return null;
+  return raw;
+}
+
+function rewriteOwnEntryUrl(namespace: string, splitNamespace: string, url: string): string {
+  const entry = ownEntryFromUrl(namespace, url);
+  if (!entry) return url;
+  return `/api/entries/get?name=${splitNamespace}/${entry.slice(namespace.length + 1)}`;
+}
+
+function pathGroupKey(namespace: string, link: LlmsLink): string {
+  const entry = ownEntryFromUrl(namespace, link.url);
+  if (entry) {
+    const rest = entry.slice(namespace.length + 1);
+    const parts = rest.split('/').filter(Boolean);
+    if (parts.length > 1) return parts[0];
+    const fileBase = parts[0]?.replace(/\.md$/i, '') ?? 'docs';
+    return fileBase.split(/[-_]/)[0] || fileBase || 'docs';
+  }
+  try {
+    const url = new URL(link.url, 'http://local');
+    const parts = url.pathname.split('/').filter(Boolean);
+    return parts[0] || 'external';
+  } catch {
+    return 'external';
+  }
+}
+
+function linkToSplitLink(namespace: string, link: LlmsLink): SplitLink {
+  return { link, sourceEntry: ownEntryFromUrl(namespace, link.url) };
+}
+
+function groupsBySections(namespace: string, doc: LlmsDoc): SplitGroup[] {
+  const used = new Set<string>();
+  return doc.sections
+    .filter((section) => section.links.length > 0)
+    .map((section) => ({
+      slug: uniqueSlug(section.name, used),
+      title: section.name,
+      links: section.links.map((link) => linkToSplitLink(namespace, link)),
+    }));
+}
+
+function groupsByPath(namespace: string, doc: LlmsDoc): SplitGroup[] {
+  const bucket = new Map<string, LlmsLink[]>();
+  for (const section of doc.sections) {
+    for (const link of section.links) {
+      const key = pathGroupKey(namespace, link);
+      bucket.set(key, [...(bucket.get(key) ?? []), link]);
+    }
+  }
+  const used = new Set<string>();
+  return [...bucket.entries()].map(([title, links]) => ({
+    slug: uniqueSlug(title, used),
+    title,
+    links: links.map((link) => linkToSplitLink(namespace, link)),
+  }));
+}
+
+function applyManualPlan(namespace: string, doc: LlmsDoc, planPath: string): SplitGroup[] {
+  let plan: ManualPlan;
+  try {
+    plan = JSON.parse(fs.readFileSync(planPath, 'utf8')) as ManualPlan;
+  } catch (e) {
+    die(`failed to read manual plan: ${e instanceof Error ? e.message : String(e)}`, 1);
+  }
+  if (plan.namespace && plan.namespace !== namespace) {
+    die(`manual plan namespace mismatch: expected ${namespace}, got ${plan.namespace}`);
+  }
+  if (!Array.isArray(plan.groups) || plan.groups.length === 0) {
+    die('manual plan must include at least one group');
+  }
+  const linksByUrl = new Map<string, LlmsLink>();
+  for (const section of doc.sections) {
+    for (const link of section.links) linksByUrl.set(link.url, link);
+  }
+  const used = new Set<string>();
+  return plan.groups.map((group) => {
+    if (!group.title || !Array.isArray(group.linkUrls)) die('manual plan group requires title and linkUrls');
+    const slug = uniqueSlug(group.slug || group.title, used);
+    const links = group.linkUrls.map((url) => {
+      const link = linksByUrl.get(url);
+      if (!link) die(`manual plan references unknown link URL: ${url}`);
+      return linkToSplitLink(namespace, link);
+    });
+    return { slug, title: group.title, links };
+  });
+}
+
+function emitManualPlan(namespace: string, groups: SplitGroup[]): void {
+  process.stdout.write(JSON.stringify({
+    namespace,
+    strategy: 'manual',
+    groups: groups.map((group) => ({
+      slug: group.slug,
+      title: group.title,
+      linkUrls: group.links.map((item) => item.link.url),
+    })),
+  }, null, 2) + '\n');
+}
+
+function generatedToday(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function buildSplitDoc(namespace: string, doc: LlmsDoc, group: SplitGroup, strategy: SplitStrategy): LlmsDoc {
+  const splitNamespace = `${namespace}--${group.slug}`;
+  return {
+    title: `${doc.title || namespace} - ${group.title}`,
+    summary: doc.summary,
+    note: `derived from \`${namespace}\` (full). Split by ${strategy}. Generated ${generatedToday()}.`,
+    sections: [{
+      name: group.title,
+      links: group.links.map((item) => ({
+        title: item.link.title,
+        url: rewriteOwnEntryUrl(namespace, splitNamespace, item.link.url),
+        description: item.link.description,
+      })),
+    }],
+  };
+}
+
+function buildSplitIndexDoc(namespace: string, doc: LlmsDoc, groups: SplitGroup[], strategy: SplitStrategy): LlmsDoc {
+  return {
+    title: `${doc.title || namespace} (split)`,
+    summary: `Split slices of \`${namespace}\`, grouped by ${strategy}. Each link below is a self-contained namespace.`,
+    note: `derived from \`${namespace}\` (full). Generated ${generatedToday()}.`,
+    sections: [{
+      name: 'Slices',
+      links: groups.map((group) => ({
+        title: `${doc.title || namespace} - ${group.title}`,
+        url: `/${namespace}--${group.slug}/llms.txt`,
+        description: `${group.links.length} links`,
+      })),
+    }],
+  };
+}
+
+function safeGeneratedDir(namespace: string, outputNamespace: string): string {
+  if (!outputNamespace.startsWith(`${namespace}--`)) die(`refusing unexpected split namespace: ${outputNamespace}`);
+  const ownRoot = path.resolve(OWN_DIR);
+  const outDir = path.resolve(OWN_DIR, outputNamespace);
+  const relative = path.relative(ownRoot, outDir);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    die(`refusing to write outside data/own: ${outputNamespace}`);
+  }
+  return outDir;
+}
+
+function copyReferencedEntries(namespace: string, splitNamespace: string, group: SplitGroup): string[] {
+  const copied: string[] = [];
+  for (const item of group.links) {
+    if (!item.sourceEntry) continue;
+    const source = path.resolve(OWN_DIR, item.sourceEntry);
+    const relativeEntry = item.sourceEntry.slice(namespace.length + 1);
+    const dest = path.resolve(OWN_DIR, splitNamespace, relativeEntry);
+    const sourceRelative = path.relative(path.resolve(OWN_DIR, namespace), source);
+    const destRelative = path.relative(path.resolve(OWN_DIR, splitNamespace), dest);
+    if (sourceRelative.startsWith('..') || path.isAbsolute(sourceRelative)) {
+      die(`refusing to copy source outside namespace: ${item.sourceEntry}`);
+    }
+    if (destRelative.startsWith('..') || path.isAbsolute(destRelative)) {
+      die(`refusing to copy destination outside split namespace: ${relativeEntry}`);
+    }
+    if (!fs.existsSync(source)) {
+      die(`referenced entry is missing: ${item.sourceEntry}`, 1);
+    }
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(source, dest);
+    copied.push(item.sourceEntry);
+  }
+  return copied;
+}
+
+function findOrphanEntries(namespace: string, groups: SplitGroup[]): string[] {
+  const namespaceRoot = path.join(OWN_DIR, namespace);
+  const referenced = new Set(groups.flatMap((group) => group.links.map((item) => item.sourceEntry).filter((entry): entry is string => !!entry)));
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        const rel = path.relative(OWN_DIR, abs).replace(/\\/g, '/');
+        if (!referenced.has(rel)) out.push(rel);
+      }
+    }
+  };
+  if (fs.existsSync(namespaceRoot)) walk(namespaceRoot);
+  return out.sort();
+}
+
+function printSplitSummary(namespace: string, groups: SplitGroup[], orphans: string[], dryRun: boolean): void {
+  const lines = [
+    `${dryRun ? 'Dry run' : 'Split'}: ${namespace}`,
+    `  groups: ${groups.length}`,
+    ...groups.map((group) => `  - ${namespace}--${group.slug}: ${group.title} (${group.links.length} links, ${group.links.filter((item) => item.sourceEntry).length} own entries)`),
+  ];
+  if (orphans.length) {
+    lines.push(`  orphans left in original: ${orphans.length}`);
+    for (const orphan of orphans.slice(0, 20)) lines.push(`    - ${orphan}`);
+    if (orphans.length > 20) lines.push(`    - ... ${orphans.length - 20} more`);
+  }
+  process.stdout.write(lines.join('\n') + '\n');
+}
+
+async function runSplit(args: string[]): Promise<void> {
+  const { namespace, options } = parseSplitOptions(args);
+  validateExistingNamespace(namespace);
+  const raw = fs.readFileSync(path.join(OWN_DIR, namespace, 'llms.txt'), 'utf8');
+  const doc = parseLlmsTxt(raw);
+  if (!doc.title || doc.sections.length === 0) die(`invalid llms.txt for namespace: ${namespace}`, 1);
+
+  let groups: SplitGroup[];
+  if (options.by === 'sections') groups = groupsBySections(namespace, doc);
+  else if (options.by === 'path') groups = groupsByPath(namespace, doc);
+  else if (options.planPath) groups = applyManualPlan(namespace, doc, options.planPath);
+  else {
+    emitManualPlan(namespace, groupsBySections(namespace, doc));
+    return;
+  }
+  if (!groups.length) die(`no split groups produced for namespace: ${namespace}`, 1);
+
+  const orphans = findOrphanEntries(namespace, groups);
+  if (options.dryRun) {
+    printSplitSummary(namespace, groups, orphans, true);
+    return;
+  }
+
+  for (const group of groups) {
+    const splitNamespace = `${namespace}--${group.slug}`;
+    const outDir = safeGeneratedDir(namespace, splitNamespace);
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.mkdirSync(outDir, { recursive: true });
+    copyReferencedEntries(namespace, splitNamespace, group);
+    fs.writeFileSync(path.join(outDir, 'llms.txt'), serializeLlmsTxt(buildSplitDoc(namespace, doc, group, options.by)), 'utf8');
+  }
+
+  const indexNamespace = `${namespace}--split`;
+  const indexDir = safeGeneratedDir(namespace, indexNamespace);
+  fs.rmSync(indexDir, { recursive: true, force: true });
+  fs.mkdirSync(indexDir, { recursive: true });
+  fs.writeFileSync(path.join(indexDir, 'llms.txt'), serializeLlmsTxt(buildSplitIndexDoc(namespace, doc, groups, options.by)), 'utf8');
+
+  printSplitSummary(namespace, groups, orphans, false);
+}
+
 /* ---------- entry point ---------- */
 
 async function main() {
@@ -418,6 +784,7 @@ async function main() {
         '  probe <url>           Detect source kind + return JSON plan',
         '  fetch-clean <url>     Fetch + clean to markdown on stdout (exit 1 on sanity failure)',
         '  openapi <spec-url>    Parse OpenAPI/Swagger spec into JSON grouped by tag',
+        '  split <namespace>     Split a namespace into focused sibling namespaces',
         '',
       ].join('\n'),
     );
@@ -437,6 +804,10 @@ async function main() {
     case 'openapi': {
       const out = await runOpenapi(args[0]);
       process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+      return;
+    }
+    case 'split': {
+      await runSplit(args);
       return;
     }
     default:

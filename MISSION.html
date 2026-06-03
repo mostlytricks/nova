@@ -1,0 +1,181 @@
+<!doctype html>
+<!--
+  MISSION.html — the durable "why" for local-llmstxt-server (one of the four clocks; see workspace CLAUDE.md §6).
+  Slowest-changing doc: purpose + principles + non-goals that should survive refactors.
+  In-flight state → CONTEXT.md. Phase roadmap → IMPLEMENTATION_PLAN.md. Theme = workspace DOC_THEME.md.
+  Converted from the original MISSION.md draft (2026-06-04).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>local-llmstxt-server — Project mission</title>
+<style>
+  :root {
+    --bg:#0f1413; --panel:#171d1c; --panel-2:#1d2423; --line:#2a3331;
+    --text-hi:#eef2f1; --text:#cbd3d1; --text-mid:#94a09d; --faint:#69736f;
+    --accent:#62a89f; --accent-d:#4f978e; --blue:#7ea6c4; --amber:#d9b27a; --red:#d98c7a;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans); font-size:15px; line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:920px; margin:0 auto; padding:56px 28px 120px; }
+  header.top { margin-bottom:14px; }
+  .logo { display:inline-flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .logo .sq {
+    width:13px; height:13px; border-radius:3px; background:var(--accent);
+    box-shadow:0 0 12px rgba(98,168,159,.40);
+  }
+  .logo .k { font-family:var(--mono); font-size:12px; color:var(--faint); letter-spacing:.04em; }
+  h1 {
+    font-size:30px; line-height:1.2; margin:4px 0 6px;
+    color:var(--text-hi); font-weight:650; letter-spacing:-.01em;
+  }
+  .lede { color:var(--text-mid); font-size:16px; margin:0 0 8px; }
+  h2 {
+    font-size:20px; color:var(--text-hi); margin:52px 0 14px; font-weight:620;
+    padding-bottom:8px; border-bottom:1px solid var(--line);
+  }
+  h2 .n { color:var(--accent); font-family:var(--mono); font-size:14px; margin-right:10px; }
+  h3 { font-size:15px; color:var(--text-hi); margin:26px 0 8px; font-weight:620; }
+  p { margin:10px 0; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  strong { color:var(--text-hi); font-weight:620; }
+  code {
+    font-family:var(--mono); font-size:.86em; color:var(--accent);
+    background:var(--panel-2); border:1px solid var(--line); padding:1px 6px; border-radius:5px;
+  }
+  pre {
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:18px 20px; overflow-x:auto; margin:16px 0;
+    font-family:var(--mono); font-size:12.5px; line-height:1.55; color:var(--text-mid);
+  }
+  pre b { color:var(--accent); font-weight:600; }
+  pre .c { color:var(--faint); }
+  .toc {
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 20px; margin:22px 0 0;
+  }
+  .toc ol { margin:0; columns:2; column-gap:32px; font-size:13.5px; }
+  .toc a { color:var(--text-mid); }
+  .toc a:hover { color:var(--accent); }
+  .note {
+    border-left:3px solid var(--accent); background:var(--panel);
+    border-radius:0 8px 8px 0; padding:12px 16px; margin:18px 0; font-size:14px;
+  }
+  .note.warn { border-left-color:var(--amber); }
+  .note .lbl { font-weight:620; color:var(--text-hi); }
+  table { width:100%; border-collapse:collapse; margin:16px 0; font-size:13.5px; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--faint); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; }
+  tbody tr:hover { background:rgba(255,255,255,.014); }
+  ul, ol { margin:10px 0; padding-left:22px; }
+  li { margin:5px 0; }
+  footer {
+    margin-top:70px; padding-top:18px; border-top:1px solid var(--line);
+    color:var(--faint); font-size:12.5px;
+  }
+  @media (max-width:680px){ .toc ol { columns:1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo"><span class="sq"></span><span class="k">local-llmstxt-server</span></div>
+    <h1>Project mission</h1>
+    <!-- lede = the ONE sentence that re-orients you. The dashboard reads it verbatim. -->
+    <p class="lede">An intranet documentation control plane that curates the small, trusted set of docs coding agents should read first — and serves it as focused, namespaced <code>llms.txt</code> manifests.</p>
+    <p style="color:var(--faint);font-size:13px;margin-top:4px">Read before <code>IMPLEMENTATION_PLAN.md</code> (the roadmap), then hand work to the agent through <code>CLAUDE.md</code> and the rolling <code>CONTEXT.md</code>.</p>
+    <div class="toc"><ol>
+      <li><a href="#mission">Mission</a></li>
+      <li><a href="#staging">Why this first</a></li>
+      <li><a href="#principles">Product principles</a></li>
+      <li><a href="#architecture">Architecture principle</a></li>
+      <li><a href="#pipeline">Planning pipeline</a></li>
+      <li><a href="#non-goals">Current non-goals</a></li>
+    </ol></div>
+  </header>
+
+  <h2 id="mission"><span class="n">01</span>Mission</h2>
+  <p><strong><code>local-llmstxt-server</code> is an intranet documentation control plane for coding agents.</strong> It helps a human curate the documentation surface agents should trust first — local project docs, internal API notes, and approved external <code>llms.txt</code> sources cached as normalized markdown — and exposes that surface as namespaced manifests, so an agent fetches a focused, relevant slice instead of drowning in (or missing) everything. The calm it creates: an agent doing software work has <em>one</em> stable place to ask "what should I read for this?" and gets back a small, trustworthy answer.</p>
+  <pre><b>north star</b>: one stable intranet URL that answers "what should an agent read
+            first" — small, trusted, namespaced
+<b>first wedge</b>: namespace docs-split — turn oversized manifests into focused,
+            agent-ready slices <span class="c">(the current active arc)</span>
+<b>later shape</b>: a full doc control plane — probe, import, promote, refresh,
+            health, and search over own + trusted external docs</pre>
+
+  <div class="note">
+    <span class="lbl">Staged, not confused.</span> Starting at docs-split isn't the whole ambition — it's the capability that proves the manifest is actually <em>usable</em> by an agent, which everything else depends on. The control-plane breadth comes after retrieval quality is real.
+  </div>
+
+  <h2 id="staging"><span class="n">02</span>Why This First</h2>
+  <p>Oversized manifests are one of the main ways this project quietly fails its mission: an agent can be shown exactly the right docs and still be unable to retrieve and use them well, because the slice is too big to fit usefully in context. Docs-split attacks that failure mode head-on — it forces the hard, real questions (how to slice without mutating originals, how to keep provenance, how an agent picks the right sibling namespace) to the front, where they belong, instead of after a pile of cosmetic features.</p>
+  <table>
+    <thead><tr><th>Stage</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>Now</code></td><td>The docs-split workflow — CLI first (per <code>IMPLEMENTATION_PLAN.md</code>); validation + health checks that flag oversized namespaces worth splitting.</td></tr>
+      <tr><td><code>Next</code></td><td>A read-only agent view (copyable manifest URLs + recommended entry points) and UI-assisted import — probe, preview, choose namespace, write, validate, optionally split.</td></tr>
+      <tr><td><code>Later</code></td><td>Trust metadata for external sources; full-text search across own + cached markdown; snapshot / refresh history with rollback; basic write-endpoint protection.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="principles"><span class="n">03</span>Product Principles</h2>
+  <!-- The commitments that should win arguments during a refactor. The "originals are immutable"
+       invariant deliberately lives in §04 (the seam), not here, to avoid restating it twice. -->
+  <ul>
+    <li><strong>Agent-first consumption.</strong> Every feature should make it easier for an agent to fetch the <em>right small set</em> of docs — not more docs, the right ones.</li>
+    <li><strong>Human-curated trust.</strong> A human decides which external sources become active and why; the server never auto-promotes a source into the trusted surface.</li>
+    <li><strong>Intranet by default.</strong> Assume a trusted local network and keep read endpoints simple — but write actions must stay <em>protectable</em> rather than permanently open.</li>
+    <li><strong>Focused namespaces beat giant manifests.</strong> Large doc sets are split into smaller, agent-ready slices; a tight namespace is a feature, not a limitation.</li>
+    <li><strong>Simple files are the source of truth.</strong> Own docs live as files under <code>data/own/</code>; the SQLite index and cache are reproducible state, safe to rebuild from scratch.</li>
+    <li><strong>Operational clarity over automation magic.</strong> Prefer explicit probe / import / promote / refresh / archive / split actions over opaque background behavior an operator can't reason about.</li>
+  </ul>
+
+  <h2 id="architecture"><span class="n">04</span>Architecture Principle</h2>
+  <p><strong>Originals are immutable; everything an agent reads is a <em>view</em> over them.</strong> Own docs and cached external content are the source — they keep their provenance (source URL, timestamps, refresh status) and are never mutated to fit a manifest. Namespaces, the master manifest, and every split are non-destructive views built <em>from</em> those originals. A split produces sibling namespaces; it never edits or destroys the namespace it came from. Every feature should extend this seam — produce or refine a view — rather than reach around it to rewrite a source.</p>
+  <pre>  <span class="c">data/own/*</span>  <span class="c">─┐</span>
+  <span class="c">cached ext</span>  <span class="c">─┼─▶</span> <b>[ namespace builder ]</b> <span class="c">─▶</span> <b>/&lt;ns&gt;/llms.txt</b>  <span class="c">(a view)</span>
+  <span class="c">splits</span>      <span class="c">─┘</span>          <span class="c">(never mutates the source)</span>
+
+  provenance <span class="c">(url · ts · refresh status)</span> travels with every imported/cached doc
+  a split emits <b>sibling</b> namespaces — the original namespace is left untouched</pre>
+
+  <h2 id="pipeline"><span class="n">05</span>Planning Pipeline</h2>
+  <p>The project docs change at different rates — keep each one narrow so the agent can resume without re-deriving the mission every time. <strong>One concern, one home:</strong> each doc owns its column; if another doc needs a fact, it links here rather than restating it.</p>
+  <table>
+    <thead><tr><th>Document</th><th>Job (what it owns)</th><th>Changes</th></tr></thead>
+    <tbody>
+      <tr><td><code>MISSION.html</code></td><td>Why: north star, principles, non-goals that survive refactors.</td><td>rarely</td></tr>
+      <tr><td><code>CLAUDE.md</code></td><td>How: repo identity, stack, constraints, entry points, how the agent should behave here.</td><td>on refactors</td></tr>
+      <tr><td><code>IMPLEMENTATION_PLAN.md</code></td><td>What/next: phase roadmap, locked decisions, the verification gate, open questions.</td><td>per phase</td></tr>
+      <tr><td><code>CONTEXT.md</code></td><td>Now: current state, last 1-2 sessions, the immediate next step.</td><td>per session</td></tr>
+      <tr><td><code>ARCHITECTURE.html</code> <span style="color:var(--faint)">(optional)</span></td><td>How it's built: component boundaries, the seam's mechanics, data contracts. Add only when "how it's built" outgrows CLAUDE.md's entry points.</td><td>on structural change</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="non-goals"><span class="n">06</span>Current Non-Goals</h2>
+  <ul>
+    <li><strong>Not a general bookmark manager.</strong> Scope is docs an agent should trust during software work, not arbitrary link-saving for humans.</li>
+    <li><strong>Not a public documentation crawler.</strong> External sources are human-probed and human-promoted, never mass-scraped — trust is a deliberate act.</li>
+    <li><strong>Not a general knowledge base or wiki.</strong> It curates and serves an existing doc surface for agents; it doesn't author, host, or become the system of record for knowledge.</li>
+    <li><strong>Not a public-internet, multi-tenant service.</strong> Intranet by default; write protection is a planned hardening (see §02 <em>Later</em>), not a pivot to hosted SaaS with accounts.</li>
+  </ul>
+
+  <div class="note warn">
+    <span class="lbl">Maintenance rule.</span> Update this file only when the mission or a durable principle changes. Use <code>CONTEXT.md</code> for in-flight state and <code>IMPLEMENTATION_PLAN.md</code> for phase-by-phase execution.
+  </div>
+
+  <footer>
+    local-llmstxt-server · project mission · stable source for purpose before roadmap, agent guidelines, and rolling context.
+  </footer>
+</div>
+</body>
+</html>

@@ -64,6 +64,10 @@ No tests yet. Verify changes by running `pnpm typecheck` (covers both `tsconfig.
 - **UI entry:** `ui/main.tsx` → `ui/App.tsx`.
 - **Frontend ↔ backend contract:** `ui/api.ts` (typed fetch helpers, must stay in sync with `server/routes/*.ts`).
 - **Background work:** `server/fetcher/scheduler.ts`.
+- **Pipeline docs** (each owns one concern; link rather than restate — workspace CLAUDE.md §6):
+  - `MISSION.html` — the durable *why*: north star, product principles, the architecture seam (§04 "originals immutable; namespaces are views"), and current non-goals.
+  - `IMPLEMENTATION_PLAN.md` — the *what/next*: the in-flight namespace docs-split build arc.
+  - `CONTEXT.md` — the rolling *now*: current state + the single next step.
 
 ## Git
 
