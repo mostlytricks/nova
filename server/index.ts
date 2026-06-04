@@ -8,6 +8,8 @@ import { registerSourcesRoutes } from './routes/sources.js';
 import { registerEntriesRoutes } from './routes/entries.js';
 import { registerContentRoutes } from './routes/content.js';
 import { registerStatsRoutes } from './routes/stats.js';
+import { registerHealthRoutes } from './routes/health.js';
+import { registerAgentRoutes } from './routes/agent.js';
 import { startScheduler } from './fetcher/scheduler.js';
 
 const app = Fastify({ logger: true });
@@ -17,6 +19,8 @@ await registerSourcesRoutes(app);
 await registerEntriesRoutes(app);
 await registerContentRoutes(app);
 await registerStatsRoutes(app);
+await registerHealthRoutes(app);
+await registerAgentRoutes(app);
 
 if (fs.existsSync(UI_DIST)) {
   await app.register(fastifyStatic, { root: UI_DIST, prefix: '/' });

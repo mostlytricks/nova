@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { api, type Source } from './api';
+import { api, type NamespaceHealthReport, type Source } from './api';
 import { Sidebar } from './components/Sidebar';
 import { LlmsTxtView } from './components/LlmsTxtView';
 import { EntryView } from './components/EntryView';
 import { SourceView } from './components/SourceView';
 import { ProbeDialog } from './components/ProbeDialog';
 import { Dashboard } from './components/Dashboard';
+import { AgentView } from './components/AgentView';
 
 export type Selection =
   | { kind: 'dashboard' }
+  | { kind: 'agent' }
   | { kind: 'own-llms' }
   | { kind: 'namespace-llms'; namespace: string }
   | { kind: 'own-entry'; name: string }
@@ -20,6 +22,7 @@ export interface Namespace {
   summary: string | null;
   note?: string | null;
   entryCount?: number;
+  health?: NamespaceHealthReport;
 }
 
 export function App() {
@@ -30,10 +33,19 @@ export function App() {
   const [probeOpen, setProbeOpen] = useState(false);
 
   const reload = async () => {
-    const [s, e, ns] = await Promise.all([api.listSources(), api.listEntries(), api.listNamespaces()]);
+    const [s, e, ns, health] = await Promise.all([
+      api.listSources(),
+      api.listEntries(),
+      api.listNamespaces(),
+      api.listNamespaceHealth(),
+    ]);
+    const healthByName = new Map(health.namespaces.map((report) => [report.namespace, report]));
     setSources(s);
     setEntries(e.entries);
-    setNamespaces(ns.namespaces);
+    setNamespaces(ns.namespaces.map((namespace) => ({
+      ...namespace,
+      health: healthByName.get(namespace.name),
+    })));
   };
 
   useEffect(() => { reload(); }, []);
@@ -58,6 +70,7 @@ export function App() {
             onReload={reload}
           />
         )}
+        {selection.kind === 'agent' && <AgentView />}
         {selection.kind === 'own-llms' && <LlmsTxtView kind="own" key="own" />}
         {selection.kind === 'namespace-llms' && (
           <LlmsTxtView

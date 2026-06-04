@@ -49,6 +49,12 @@ export function Sidebar({
       >
         Dashboard
       </div>
+      <div
+        className={`item ${selection.kind === 'agent' ? 'active' : ''}`}
+        onClick={() => onSelect({ kind: 'agent' })}
+      >
+        Agent view
+      </div>
 
       <h2>Master</h2>
       <div
@@ -161,6 +167,14 @@ function NamespaceGroup({
         {typeof ns.entryCount === 'number' && (
           <span className="badge" style={{ marginLeft: 'auto' }} title="links in llms.txt">
             {ns.entryCount}
+          </span>
+        )}
+        {ns.health && ns.health.status !== 'healthy' && (
+          <span
+            className={`badge health-dot ${ns.health.status}`}
+            title={`${ns.health.status}: ${ns.health.errors.length} errors, ${ns.health.warnings.length} warnings`}
+          >
+            {ns.health.status === 'error' ? '!' : '?'}
           </span>
         )}
         <span

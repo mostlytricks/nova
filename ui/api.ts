@@ -28,6 +28,73 @@ export interface Link {
   position: number;
 }
 
+export interface NamespaceHealthIssue {
+  severity: 'error' | 'warning';
+  code: string;
+  message: string;
+  path?: string;
+}
+
+export interface NamespaceHealthReport {
+  namespace: string;
+  status: 'healthy' | 'warn' | 'error';
+  errors: NamespaceHealthIssue[];
+  warnings: NamespaceHealthIssue[];
+  stats: {
+    sections: number;
+    links: number;
+    entries: number;
+    externalLinks: number;
+    orphans: number;
+    bytes: number;
+    tinyEntries: number;
+    oversizedEntries: number;
+    duplicateUrls: number;
+  };
+  recommendation: {
+    strategy: 'sections' | 'path';
+    reason: string;
+    command: string;
+  } | null;
+}
+
+export interface AgentIndexLink {
+  label: string;
+  url: string;
+  absoluteUrl: string;
+}
+
+export interface AgentNamespaceLink extends AgentIndexLink {
+  name: string;
+  title: string;
+  summary: string | null;
+  health: NamespaceHealthReport['status'];
+  links: number;
+  isSplit: boolean;
+  isSplitIndex: boolean;
+  sourceNamespace: string | null;
+}
+
+export interface AgentIndex {
+  generatedAt: number;
+  master: AgentIndexLink;
+  mergedExternal: AgentIndexLink & { activeSourceCount: number };
+  startHere: AgentNamespaceLink | null;
+  namespaces: AgentNamespaceLink[];
+  splitIndexes: AgentNamespaceLink[];
+  activeSources: {
+    id: number;
+    title: string;
+    url: string;
+    lastFetched: number | null;
+    lastError: string | null;
+  }[];
+  snippets: {
+    title: string;
+    text: string;
+  }[];
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...init,
@@ -88,6 +155,11 @@ export const api = {
         entryCount?: number;
       }[];
     }>('/api/namespaces'),
+  listNamespaceHealth: () =>
+    json<{ generatedAt: number; namespaces: NamespaceHealthReport[] }>('/api/health/namespaces'),
+  getNamespaceHealth: (name: string) =>
+    json<NamespaceHealthReport>(`/api/health/namespaces/${encodeURIComponent(name)}`),
+  getAgentIndex: () => json<AgentIndex>('/api/agent/index'),
   putNamespaceNote: (name: string, note: string) =>
     json<{ ok: true; note: string | null }>(
       `/api/namespaces/${encodeURIComponent(name)}/note`,

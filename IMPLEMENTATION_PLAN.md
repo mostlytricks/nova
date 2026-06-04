@@ -9,8 +9,8 @@
 
 The active build strategy is staged:
 
-1. Make oversized namespaces usable by splitting them into smaller agent-ready views.
-2. Add health checks so operators can tell whether docs are valid, stale, broken, or too large.
+1. Make oversized namespaces usable by splitting them into smaller agent-ready views. **Done in Phase 1.**
+2. Add health checks so operators can tell whether docs are valid, stale, broken, or too large. **Done in Phase 2.**
 3. Surface those signals in the dashboard and expose a read-only agent entry view.
 4. Add trust, history, protection, and search after the retrieval quality loop is solid.
 
@@ -37,6 +37,8 @@ The active build strategy is staged:
 ---
 
 ## Phase 1 — Namespace Docs-Split CLI
+
+Status: **implemented 2026-06-04** in `server/bin/docs-import.ts`.
 
 ### Goal
 
@@ -206,6 +208,8 @@ Use ASCII punctuation in generated files.
 
 ## Phase 2 — Namespace Health Checks
 
+Status: **implemented 2026-06-04** in `server/health.ts` and `server/bin/docs-import.ts`.
+
 ### Goal
 
 Add a CLI health check that tells an operator whether a namespace is agent-ready.
@@ -274,6 +278,7 @@ JSON output should be stable enough for the UI to consume later:
 
 | File | Work |
 |---|---|
+| `server/health.ts` | Shared health report logic for CLI now and dashboard later. |
 | `server/bin/docs-import.ts` | Add `check` subcommand. |
 | `server/parser.ts` | Reuse manifest parser. |
 | `server/own.ts` | Reuse namespace/list/read helpers where practical. |
@@ -294,6 +299,8 @@ JSON output should be stable enough for the UI to consume later:
 ---
 
 ## Phase 3 — Dashboard Health Signals
+
+Status: **implemented 2026-06-04** in `server/routes/health.ts`, `ui/api.ts`, `ui/App.tsx`, `ui/components/Dashboard.tsx`, and `ui/components/Sidebar.tsx`.
 
 ### Goal
 
@@ -344,6 +351,13 @@ Return the same shape as `docs-import check --json`.
 
 - Dashboard shows health status without mutating files.
 - API and CLI share the same health semantics.
+
+### Verification Notes
+
+- `pnpm typecheck` passes.
+- `pnpm build` passes when run outside the sandbox so Vite/esbuild can spawn.
+- `GET /api/health/namespaces`, `/api/health/namespaces/demos`, and `/api/health/namespaces/test-2` return the shared report shape.
+- Browser visual verification was attempted, but no in-app browser backend was available in this session.
 
 ---
 
@@ -536,4 +550,4 @@ For each phase:
 
 ## Immediate Next Step
 
-Implement **Phase 1 — Namespace Docs-Split CLI**, starting in `server/bin/docs-import.ts`.
+Implement **Phase 4 — Read-Only Agent View**, starting with a simple read-only route/page that shows the URLs agents should use.

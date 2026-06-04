@@ -19,6 +19,10 @@ pnpm docs-import fetch-clean <url>
 pnpm docs-import openapi <spec-url>
   → JSON: { info, servers, securitySchemes, tags: [{ name, description, endpoints: [...] }] }
 
+pnpm docs-import check <namespace> [--json]
+pnpm docs-import check --all [--json]
+  → namespace health report; exit 1 if hard errors are present
+
 pnpm docs-import split <namespace> [--by sections|path|manual] [--dry-run]
   → creates focused sibling namespaces like <namespace>--guides plus <namespace>--split
 ```
@@ -211,6 +215,7 @@ Rules:
 - [ ] No nav/footer/marketing fragments left ("Sign up for our newsletter", "© 2024", "Edit this page").
 - [ ] No broken relative links (rewrite to absolute URLs of the source, or drop).
 - [ ] Total namespace under ~100k chars. If bigger, the operator probably wants a narrower scope.
+- [ ] `pnpm docs-import check <namespace>` reports `healthy` or only intentional warnings.
 
 ---
 
@@ -268,7 +273,7 @@ function importDocs(url, mode):
   for g in groups: write(`data/own/${namespace}/${g.slug}.md`, concat(g.pages))
   if mode == "A": write(`data/own/${namespace}/llms.txt`, buildManifest(plan, groups))
 
-  runQualityChecks(namespace)
+  shell("pnpm docs-import check " + namespace)
   report({ fetched: plan.seedUrls.length, written: groups.length, skipped })
 ```
 

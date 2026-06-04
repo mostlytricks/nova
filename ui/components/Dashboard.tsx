@@ -32,6 +32,11 @@ export function Dashboard({ namespaces, sources, onSelect, onReload }: Props) {
       {stats && (
         <div className="stat-strip">
           <Stat label="Namespaces" value={stats.namespaces.count} />
+          <Stat
+            label="Namespace health"
+            value={healthSummary(namespaces)}
+            tone={namespaces.some((ns) => ns.health?.status === 'error') ? 'warn' : undefined}
+          />
           <Stat label="Own entries" value={stats.ownEntries.count} />
           <Stat
             label="Sources"
@@ -131,16 +136,35 @@ function NamespaceCard({
             <code>{ns.name}/</code> · {linkCount} {linkCount === 1 ? 'link' : 'links'}
           </div>
         </div>
-        <a
-          className="card-link"
-          href={`/${ns.name}/llms.txt`}
-          target="_blank"
-          rel="noreferrer"
-          title="Open raw llms.txt"
-        >
-          llms.txt ↗
-        </a>
+        <div className="card-actions">
+          {ns.health && <HealthBadge status={ns.health.status} />}
+          <a
+            className="card-link"
+            href={`/${ns.name}/llms.txt`}
+            target="_blank"
+            rel="noreferrer"
+            title="Open raw llms.txt"
+          >
+            llms.txt ↗
+          </a>
+        </div>
       </div>
+      {ns.health && ns.health.status !== 'healthy' && (
+        <div className={`health-summary ${ns.health.status}`}>
+          <strong>{ns.health.errors.length} errors</strong>
+          {' · '}
+          <span>{ns.health.warnings.length} warnings</span>
+          {ns.health.recommendation && (
+            <>
+              {' · '}
+              <span>{ns.health.recommendation.strategy} split suggested</span>
+            </>
+          )}
+          <div className="health-issue">
+            {(ns.health.errors[0] ?? ns.health.warnings[0])?.message}
+          </div>
+        </div>
+      )}
       {ns.summary && <div className="card-summary">{ns.summary}</div>}
       <NoteEditor
         value={ns.note ?? ''}
@@ -152,6 +176,17 @@ function NamespaceCard({
       />
     </div>
   );
+}
+
+function HealthBadge({ status }: { status: 'healthy' | 'warn' | 'error' }) {
+  return <span className={`health-badge ${status}`}>{status}</span>;
+}
+
+function healthSummary(namespaces: Namespace[]): string {
+  const errors = namespaces.filter((ns) => ns.health?.status === 'error').length;
+  const warnings = namespaces.filter((ns) => ns.health?.status === 'warn').length;
+  if (errors || warnings) return `${errors} error · ${warnings} warn`;
+  return namespaces.length ? 'healthy' : '—';
 }
 
 function SourceCard({

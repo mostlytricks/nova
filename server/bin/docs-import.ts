@@ -6,6 +6,7 @@
  *   probe <url>             Detect source type + return JSON plan
  *   fetch-clean <url>       Fetch a single URL and print clean markdown to stdout
  *   openapi <spec-url>      Parse an OpenAPI/Swagger spec into structured JSON grouped by tag
+ *   check <namespace>       Check namespace health
  *   split <namespace>       Split a namespace into focused sibling namespaces
  *
  * Output goes to stdout in the command-specific format. Errors go to stderr;
@@ -18,6 +19,7 @@ import { JSDOM } from 'jsdom';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { fetchMarkdown } from '../fetcher/fetch.js';
 import { OWN_DIR } from '../config.js';
+import { checkAllNamespaces, checkNamespaceHealth, type NamespaceHealthReport } from '../health.js';
 import { parseLlmsTxt, serializeLlmsTxt, type LlmsDoc, type LlmsLink } from '../parser.js';
 
 /* ---------- shared helpers ---------- */
@@ -410,6 +412,80 @@ async function runOpenapi(rawUrl: string): Promise<unknown> {
   };
 }
 
+/* ---------- check ---------- */
+
+interface CheckOptions {
+  namespace: string | null;
+  all: boolean;
+  json: boolean;
+}
+
+function parseCheckOptions(args: string[]): CheckOptions {
+  const options: CheckOptions = { namespace: null, all: false, json: false };
+  for (const arg of args) {
+    if (arg === '--all') {
+      options.all = true;
+    } else if (arg === '--json') {
+      options.json = true;
+    } else if (arg.startsWith('--')) {
+      die(`unknown check option: ${arg}`);
+    } else if (!options.namespace) {
+      options.namespace = arg;
+    } else {
+      die(`unexpected check argument: ${arg}`);
+    }
+  }
+  if (options.all && options.namespace) die('check accepts either <namespace> or --all, not both');
+  if (!options.all && !options.namespace) die('check requires a namespace or --all');
+  return options;
+}
+
+function printHealthReport(report: NamespaceHealthReport): void {
+  const lines = [
+    `${report.namespace}: ${report.status}`,
+    `  links: ${report.stats.links}`,
+    `  entries: ${report.stats.entries}`,
+    `  warnings: ${report.warnings.length}`,
+  ];
+  if (report.errors.length) lines.push(`  errors: ${report.errors.length}`);
+  if (report.stats.orphans) lines.push(`  orphans: ${report.stats.orphans}`);
+  if (report.recommendation) lines.push(`  recommendation: ${report.recommendation.command}`);
+  for (const issue of [...report.errors, ...report.warnings].slice(0, 12)) {
+    lines.push(`  - ${issue.severity}: ${issue.code}: ${issue.message}`);
+  }
+  const hidden = report.errors.length + report.warnings.length - 12;
+  if (hidden > 0) lines.push(`  - ... ${hidden} more issues`);
+  process.stdout.write(lines.join('\n') + '\n');
+}
+
+function printHealthReports(reports: NamespaceHealthReport[]): void {
+  reports.forEach((report, i) => {
+    if (i) process.stdout.write('\n');
+    printHealthReport(report);
+  });
+}
+
+async function runCheck(args: string[]): Promise<void> {
+  const options = parseCheckOptions(args);
+  const reports = options.all ? checkAllNamespaces() : [checkNamespaceHealth(options.namespace!)];
+  if (options.json) {
+    const payload = options.all
+      ? {
+          status: reports.some((report) => report.status === 'error')
+            ? 'error'
+            : reports.some((report) => report.status === 'warn')
+              ? 'warn'
+              : 'healthy',
+          namespaces: reports,
+        }
+      : reports[0];
+    process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
+  } else {
+    printHealthReports(reports);
+  }
+  if (reports.some((report) => report.status === 'error')) process.exit(1);
+}
+
 /* ---------- split ---------- */
 
 type SplitStrategy = 'sections' | 'path' | 'manual';
@@ -784,6 +860,7 @@ async function main() {
         '  probe <url>           Detect source kind + return JSON plan',
         '  fetch-clean <url>     Fetch + clean to markdown on stdout (exit 1 on sanity failure)',
         '  openapi <spec-url>    Parse OpenAPI/Swagger spec into JSON grouped by tag',
+        '  check <namespace>     Check namespace health (or use --all, --json)',
         '  split <namespace>     Split a namespace into focused sibling namespaces',
         '',
       ].join('\n'),
@@ -804,6 +881,10 @@ async function main() {
     case 'openapi': {
       const out = await runOpenapi(args[0]);
       process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+      return;
+    }
+    case 'check': {
+      await runCheck(args);
       return;
     }
     case 'split': {
