@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Markdown from 'react-markdown';
-import { api, type Link, type Source } from '../api';
+import { api, type Link, type LinkRefreshRecord, type Source, type SourceRefreshRecord } from '../api';
 
 export function SourceView({
   id,
@@ -16,11 +16,14 @@ export function SourceView({
   const [selected, setSelected] = useState<Link | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [contentErr, setContentErr] = useState<string | null>(null);
+  const [sourceHistory, setSourceHistory] = useState<SourceRefreshRecord[]>([]);
+  const [linkHistory, setLinkHistory] = useState<LinkRefreshRecord[]>([]);
 
   const load = async () => {
-    const r = await api.getSource(id);
+    const [r, history] = await Promise.all([api.getSource(id), api.getSourceHistory(id)]);
     setSource(r.source);
     setLinks(r.links);
+    setSourceHistory(history.refreshes);
   };
 
   useEffect(() => {
@@ -38,6 +41,14 @@ export function SourceView({
       .catch((e) => setContentErr(String(e)));
   }, [selected]);
 
+  useEffect(() => {
+    if (!selected) {
+      setLinkHistory([]);
+      return;
+    }
+    api.getLinkHistory(selected.id).then((r) => setLinkHistory(r.refreshes)).catch(() => setLinkHistory([]));
+  }, [selected?.id]);
+
   if (!source) return <div className="meta">Loading…</div>;
 
   const refresh = async () => {
@@ -46,7 +57,23 @@ export function SourceView({
   };
 
   const setState = async (state: Source['state']) => {
-    await api.patchSource(id, { state });
+    if (state === 'active' && source.state !== 'active') {
+      const promotion_reason = prompt('Promotion reason for trusting this source:');
+      if (promotion_reason === null) return;
+      await api.patchSource(id, {
+        state,
+        promotion_reason,
+        last_reviewed_at: Date.now(),
+      });
+    } else {
+      await api.patchSource(id, { state });
+    }
+    await load();
+    onChanged();
+  };
+
+  const patchSource = async (body: Partial<Source>) => {
+    await api.patchSource(id, body);
     await load();
     onChanged();
   };
@@ -112,6 +139,62 @@ export function SourceView({
             style={{ width: '100%', minHeight: 50 }}
           />
         </span>
+        <span className="k">Owner</span>
+        <span>
+          <input
+            defaultValue={source.owner ?? ''}
+            placeholder="Team or person responsible"
+            onBlur={(e) => patchSource({ owner: e.target.value })}
+            style={{ width: '100%' }}
+          />
+        </span>
+        <span className="k">Intended use</span>
+        <span>
+          <textarea
+            defaultValue={source.intended_use ?? ''}
+            placeholder="When agents should use this source"
+            onBlur={(e) => patchSource({ intended_use: e.target.value })}
+            style={{ width: '100%', minHeight: 44 }}
+          />
+        </span>
+        <span className="k">Trust note</span>
+        <span>
+          <textarea
+            defaultValue={source.trust_note ?? ''}
+            placeholder="Why this source is trusted"
+            onBlur={(e) => patchSource({ trust_note: e.target.value })}
+            style={{ width: '100%', minHeight: 44 }}
+          />
+        </span>
+        <span className="k">Warning</span>
+        <span>
+          <textarea
+            defaultValue={source.warning ?? ''}
+            placeholder="Caveats agents should see before relying on it"
+            onBlur={(e) => patchSource({ warning: e.target.value })}
+            style={{ width: '100%', minHeight: 44 }}
+          />
+        </span>
+        <span className="k">Last reviewed</span>
+        <span>
+          {source.last_reviewed_at ? new Date(source.last_reviewed_at).toLocaleString() : 'never'}
+          {' '}
+          <button
+            style={{ padding: '2px 6px', fontSize: 11 }}
+            onClick={() => patchSource({ last_reviewed_at: Date.now() })}
+          >
+            Mark reviewed
+          </button>
+        </span>
+        <span className="k">Promotion reason</span>
+        <span>
+          <textarea
+            defaultValue={source.promotion_reason ?? ''}
+            placeholder="Why this source was promoted to active"
+            onBlur={(e) => patchSource({ promotion_reason: e.target.value })}
+            style={{ width: '100%', minHeight: 44 }}
+          />
+        </span>
         {source.last_error && (
           <>
             <span className="k">Last error</span>
@@ -120,8 +203,8 @@ export function SourceView({
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, height: 'calc(100vh - 380px)' }}>
-        <div style={{ overflowY: 'auto', border: '1px solid #1f2430', borderRadius: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) minmax(0, 1fr)', gap: 16, minHeight: 420 }}>
+        <div style={{ overflowY: 'auto', border: '1px solid #1f2430', borderRadius: 6, maxHeight: '70vh' }}>
           {links.length === 0 && <div className="meta" style={{ padding: 12 }}>No links yet — refresh the source.</div>}
           {groupLinks(links).map(([section, ll]) => (
             <div key={section}>
@@ -144,7 +227,7 @@ export function SourceView({
             </div>
           ))}
         </div>
-        <div className="preview" style={{ overflowY: 'auto' }}>
+        <div className="preview" style={{ overflowY: 'auto', maxHeight: '70vh' }}>
           {!selected && <div className="meta">Select a link to preview its normalized markdown.</div>}
           {selected && !selected.cache_hash && (
             <div>
@@ -167,8 +250,98 @@ export function SourceView({
           )}
         </div>
       </div>
+
+      <div style={{ marginTop: 20 }}>
+        <h2 className="section-title">Refresh history</h2>
+        <div className="history-grid">
+          <div className="history-panel">
+            <div className="history-heading">Source refreshes</div>
+            {sourceHistory.length === 0 ? (
+              <div className="meta" style={{ padding: '8px 0' }}>No source refresh history yet.</div>
+            ) : (
+              sourceHistory.map((item) => (
+                <HistoryRow
+                  key={item.id}
+                  status={item.status}
+                  title={item.next_title || item.previous_title || source.title || source.url}
+                  time={item.finished_at ?? item.started_at}
+                  detail={sourceHistoryDetail(item)}
+                  error={item.error}
+                />
+              ))
+            )}
+          </div>
+          <div className="history-panel">
+            <div className="history-heading">Selected link refreshes</div>
+            {!selected && <div className="meta" style={{ padding: '8px 0' }}>Select a link to inspect its history.</div>}
+            {selected && linkHistory.length === 0 && (
+              <div className="meta" style={{ padding: '8px 0' }}>No link refresh history yet.</div>
+            )}
+            {selected && linkHistory.map((item) => (
+              <HistoryRow
+                key={item.id}
+                status={item.status}
+                title={selected.title || selected.url}
+                time={item.finished_at ?? item.started_at}
+                detail={linkHistoryDetail(item)}
+                error={item.error}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
+}
+
+function HistoryRow({
+  status,
+  title,
+  time,
+  detail,
+  error,
+}: {
+  status: 'pending' | 'ok' | 'not_modified' | 'error';
+  title: string;
+  time: number;
+  detail: string;
+  error: string | null;
+}) {
+  return (
+    <div className="history-row">
+      <div className="history-row-top">
+        <span className={`history-pill ${status}`}>{status}</span>
+        <span className="history-row-title">{title}</span>
+        <span className="history-row-time">{new Date(time).toLocaleString()}</span>
+      </div>
+      <div className="history-row-detail">{detail}</div>
+      {error && <div className="error" style={{ fontSize: 12 }}>{error}</div>}
+    </div>
+  );
+}
+
+function sourceHistoryDetail(item: SourceRefreshRecord): string {
+  const parts = [
+    item.http_status ? `HTTP ${item.http_status}` : 'HTTP -',
+    item.previous_link_count !== null && item.next_link_count !== null
+      ? `${item.previous_link_count} -> ${item.next_link_count} links`
+      : '',
+    item.added_link_count !== null ? `+${item.added_link_count}` : '',
+    item.removed_link_count !== null ? `-${item.removed_link_count}` : '',
+    item.changed_link_count !== null ? `~${item.changed_link_count}` : '',
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function linkHistoryDetail(item: LinkRefreshRecord): string {
+  const parts = [
+    item.http_status ? `HTTP ${item.http_status}` : 'HTTP -',
+    item.changed ? 'changed' : 'unchanged',
+    item.content_type ? item.content_type : '',
+    item.bytes !== null ? `${item.bytes} bytes` : '',
+    item.previous_cache_hash && item.cache_hash ? `${item.previous_cache_hash.slice(0, 8)} → ${item.cache_hash.slice(0, 8)}` : '',
+  ].filter(Boolean);
+  return parts.join(' · ');
 }
 
 function groupLinks(links: Link[]): [string, Link[]][] {

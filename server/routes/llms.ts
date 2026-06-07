@@ -17,6 +17,7 @@ import {
   createNamespace,
   deleteNamespace,
 } from '../own.js';
+import { requireWriteAccess } from '../write-protect.js';
 
 export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
   /* -------- master llms.txt -------- */
@@ -82,14 +83,16 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
     return { raw: readOwnRaw(), parsed: readOwnLlms(), exists: existsOnDisk() };
   });
 
-  app.put<{ Body: { raw: string } }>('/api/llms/own', async (req) => {
+  app.put<{ Body: { raw: string } }>('/api/llms/own', async (req, reply) => {
+    if (!requireWriteAccess(req, reply)) return;
     const raw = req.body?.raw ?? '';
     const parsed = parseLlmsTxt(raw);
     writeOwnRaw(serializeLlmsTxt(parsed));
     return { ok: true };
   });
 
-  app.post('/api/llms/own/regenerate', async () => {
+  app.post('/api/llms/own/regenerate', async (req, reply) => {
+    if (!requireWriteAccess(req, reply)) return;
     const raw = generateMasterRaw();
     writeOwnRaw(raw);
     return { raw };
@@ -117,6 +120,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Params: { name: string }; Body: { note: string } }>(
     '/api/namespaces/:name/note',
     async (req, reply) => {
+      if (!requireWriteAccess(req, reply)) return;
       try {
         const doc = readNamespaceLlms(req.params.name);
         const trimmed = (req.body?.note ?? '').trim();
@@ -132,6 +136,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { name: string; title?: string; summary?: string } }>(
     '/api/namespaces',
     async (req, reply) => {
+      if (!requireWriteAccess(req, reply)) return;
       const { name, title, summary } = req.body ?? ({} as any);
       if (!name) return reply.code(400).send({ error: 'name required' });
       try {
@@ -144,6 +149,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
   );
 
   app.delete<{ Params: { name: string } }>('/api/namespaces/:name', async (req, reply) => {
+    if (!requireWriteAccess(req, reply)) return;
     try {
       deleteNamespace(req.params.name);
       return { ok: true };
@@ -163,6 +169,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Params: { name: string }; Body: { raw: string } }>(
     '/api/namespaces/:name/llms',
     async (req, reply) => {
+      if (!requireWriteAccess(req, reply)) return;
       try {
         const parsed = parseLlmsTxt(req.body?.raw ?? '');
         writeNamespaceRaw(req.params.name, serializeLlmsTxt(parsed));

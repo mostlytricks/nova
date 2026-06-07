@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { db, type SourceRow, type LinkRow } from '../db.js';
+import { db, type SourceRow, type LinkRow, type SourceRefreshRow, type LinkRefreshRow } from '../db.js';
 import { probeSource, refreshSource, refreshLink } from '../fetcher/source.js';
+import { requireWriteAccess } from '../write-protect.js';
 
 export async function registerSourcesRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/sources', async () => {
@@ -23,6 +24,20 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
     return { source: formatSource(source), links };
   });
 
+  app.get<{ Params: { id: string } }>('/api/sources/:id/history', async (req, reply) => {
+    const id = Number(req.params.id);
+    const source = db.prepare('SELECT * FROM sources WHERE id = ?').get(id) as SourceRow | undefined;
+    if (!source) return reply.code(404).send({ error: 'not found' });
+    const refreshes = db
+      .prepare(
+        `SELECT * FROM source_refreshes
+         WHERE source_id = ?
+         ORDER BY started_at DESC, id DESC`,
+      )
+      .all(id) as SourceRefreshRow[];
+    return { source: formatSource(source), refreshes };
+  });
+
   app.post<{ Body: { url: string } }>('/api/sources/probe', async (req, reply) => {
     const url = req.body?.url?.trim();
     if (!url) return reply.code(400).send({ error: 'url required' });
@@ -31,18 +46,37 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
     return result;
   });
 
-  app.post<{ Body: { url: string; tags?: string[]; notes?: string; ttl_hours?: number } }>(
+  app.post<{ Body: {
+    url: string;
+    tags?: string[];
+    notes?: string;
+    ttl_hours?: number;
+    owner?: string | null;
+    trust_note?: string | null;
+    intended_use?: string | null;
+    warning?: string | null;
+  } }>(
     '/api/sources',
     async (req, reply) => {
-      const { url, tags = [], notes = '', ttl_hours } = req.body ?? ({} as any);
+      if (!requireWriteAccess(req, reply)) return;
+      const {
+        url,
+        tags = [],
+        notes = '',
+        ttl_hours,
+        owner = null,
+        trust_note = null,
+        intended_use = null,
+        warning = null,
+      } = req.body ?? ({} as any);
       if (!url) return reply.code(400).send({ error: 'url required' });
       const probe = await probeSource(url);
       if (!probe.ok || !probe.doc) {
         return reply.code(400).send({ error: probe.error ?? 'probe failed' });
       }
       const stmt = db.prepare(
-        `INSERT INTO sources (url, title, summary, state, ttl_hours, tags, notes)
-         VALUES (?, ?, ?, 'trial', ?, ?, ?)`,
+        `INSERT INTO sources (url, title, summary, state, ttl_hours, tags, notes, owner, trust_note, intended_use, warning)
+         VALUES (?, ?, ?, 'trial', ?, ?, ?, ?, ?, ?, ?)`,
       );
       let id: number;
       try {
@@ -53,6 +87,10 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
           ttl_hours ?? null,
           JSON.stringify(tags),
           notes,
+          nullableText(owner),
+          nullableText(trust_note),
+          nullableText(intended_use),
+          nullableText(warning),
         );
         id = Number(r.lastInsertRowid);
       } catch (e) {
@@ -72,19 +110,39 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
       notes: string;
       ttl_hours: number | null;
       title: string;
+      owner: string | null;
+      trust_note: string | null;
+      intended_use: string | null;
+      warning: string | null;
+      last_reviewed_at: number | null;
+      promotion_reason: string | null;
     }>;
   }>('/api/sources/:id', async (req, reply) => {
+    if (!requireWriteAccess(req, reply)) return;
     const id = Number(req.params.id);
     const source = db.prepare('SELECT * FROM sources WHERE id = ?').get(id) as SourceRow | undefined;
     if (!source) return reply.code(404).send({ error: 'not found' });
     const body = req.body ?? {};
     const sets: string[] = [];
     const params: any[] = [];
-    if (body.state) { sets.push('state = ?'); params.push(body.state); }
+    if (body.state) {
+      sets.push('state = ?');
+      params.push(body.state);
+      if (body.state === 'active' && source.state !== 'active' && body.last_reviewed_at === undefined) {
+        sets.push('last_reviewed_at = ?');
+        params.push(Date.now());
+      }
+    }
     if (body.tags) { sets.push('tags = ?'); params.push(JSON.stringify(body.tags)); }
     if (body.notes !== undefined) { sets.push('notes = ?'); params.push(body.notes); }
     if (body.ttl_hours !== undefined) { sets.push('ttl_hours = ?'); params.push(body.ttl_hours); }
     if (body.title !== undefined) { sets.push('title = ?'); params.push(body.title); }
+    if (body.owner !== undefined) { sets.push('owner = ?'); params.push(nullableText(body.owner)); }
+    if (body.trust_note !== undefined) { sets.push('trust_note = ?'); params.push(nullableText(body.trust_note)); }
+    if (body.intended_use !== undefined) { sets.push('intended_use = ?'); params.push(nullableText(body.intended_use)); }
+    if (body.warning !== undefined) { sets.push('warning = ?'); params.push(nullableText(body.warning)); }
+    if (body.last_reviewed_at !== undefined) { sets.push('last_reviewed_at = ?'); params.push(body.last_reviewed_at); }
+    if (body.promotion_reason !== undefined) { sets.push('promotion_reason = ?'); params.push(nullableText(body.promotion_reason)); }
     if (sets.length === 0) return formatSource(source);
     params.push(id);
     db.prepare(`UPDATE sources SET ${sets.join(', ')} WHERE id = ?`).run(...params);
@@ -95,6 +153,7 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
   app.delete<{ Params: { id: string }; Body: { reason?: string } }>(
     '/api/sources/:id',
     async (req, reply) => {
+      if (!requireWriteAccess(req, reply)) return;
       const id = Number(req.params.id);
       const source = db.prepare('SELECT * FROM sources WHERE id = ?').get(id) as SourceRow | undefined;
       if (!source) return reply.code(404).send({ error: 'not found' });
@@ -113,6 +172,7 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
   );
 
   app.post<{ Params: { id: string } }>('/api/sources/:id/refresh', async (req, reply) => {
+    if (!requireWriteAccess(req, reply)) return;
     const id = Number(req.params.id);
     const result = await refreshSource(id);
     if (!result.ok) return reply.code(400).send({ error: result.error });
@@ -120,9 +180,24 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.post<{ Params: { id: string } }>('/api/links/:id/refresh', async (req, reply) => {
+    if (!requireWriteAccess(req, reply)) return;
     const id = Number(req.params.id);
     await refreshLink(id);
     return { ok: true };
+  });
+
+  app.get<{ Params: { id: string } }>('/api/links/:id/history', async (req, reply) => {
+    const id = Number(req.params.id);
+    const link = db.prepare('SELECT * FROM links WHERE id = ?').get(id) as LinkRow | undefined;
+    if (!link) return reply.code(404).send({ error: 'not found' });
+    const refreshes = db
+      .prepare(
+        `SELECT * FROM link_refreshes
+         WHERE link_id = ?
+         ORDER BY started_at DESC, id DESC`,
+      )
+      .all(id) as LinkRefreshRow[];
+    return { link, refreshes };
   });
 
   app.get('/api/tombstones', async () => {
@@ -140,6 +215,12 @@ function formatSource(s: SourceRow) {
     ttl_hours: s.ttl_hours,
     tags: safeJson<string[]>(s.tags, []),
     notes: s.notes,
+    owner: s.owner,
+    trust_note: s.trust_note,
+    intended_use: s.intended_use,
+    warning: s.warning,
+    last_reviewed_at: s.last_reviewed_at,
+    promotion_reason: s.promotion_reason,
     last_fetched: s.last_fetched,
     last_accessed: s.last_accessed,
     last_error: s.last_error,
@@ -149,4 +230,9 @@ function formatSource(s: SourceRow) {
 
 function safeJson<T>(s: string, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }
+}
+
+function nullableText(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }

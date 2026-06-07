@@ -21,6 +21,12 @@ CREATE TABLE IF NOT EXISTS sources (
   ttl_hours     INTEGER,                       -- null = use default
   tags          TEXT NOT NULL DEFAULT '[]',    -- JSON array
   notes         TEXT NOT NULL DEFAULT '',
+  owner         TEXT,
+  trust_note    TEXT,
+  intended_use  TEXT,
+  warning       TEXT,
+  last_reviewed_at INTEGER,
+  promotion_reason TEXT,
   etag          TEXT,
   last_modified TEXT,
   last_fetched  INTEGER,                       -- epoch ms
@@ -55,7 +61,64 @@ CREATE TABLE IF NOT EXISTS tombstones (
   reason      TEXT,
   removed_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')*1000)
 );
+
+CREATE TABLE IF NOT EXISTS source_refreshes (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_id          INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+  started_at         INTEGER NOT NULL,
+  finished_at        INTEGER,
+  status             TEXT NOT NULL,               -- pending | ok | not_modified | error
+  http_status        INTEGER,
+  error              TEXT,
+  previous_title     TEXT,
+  previous_summary   TEXT,
+  next_title         TEXT,
+  next_summary       TEXT,
+  previous_link_count INTEGER,
+  next_link_count    INTEGER,
+  added_link_count    INTEGER,
+  removed_link_count  INTEGER,
+  changed_link_count  INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_refreshes_source_started
+  ON source_refreshes(source_id, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS link_refreshes (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  link_id            INTEGER REFERENCES links(id) ON DELETE SET NULL,
+  source_id          INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+  url                TEXT NOT NULL,
+  started_at         INTEGER NOT NULL,
+  finished_at        INTEGER,
+  status             TEXT NOT NULL,               -- pending | ok | not_modified | error
+  http_status        INTEGER,
+  error              TEXT,
+  previous_cache_hash TEXT,
+  cache_hash         TEXT,
+  content_type       TEXT,
+  etag               TEXT,
+  last_modified      TEXT,
+  bytes              INTEGER,
+  changed            INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_link_refreshes_link_started
+  ON link_refreshes(link_id, started_at DESC);
 `);
+
+ensureColumn('sources', 'owner', 'TEXT');
+ensureColumn('sources', 'trust_note', 'TEXT');
+ensureColumn('sources', 'intended_use', 'TEXT');
+ensureColumn('sources', 'warning', 'TEXT');
+ensureColumn('sources', 'last_reviewed_at', 'INTEGER');
+ensureColumn('sources', 'promotion_reason', 'TEXT');
+
+function ensureColumn(table: string, column: string, type: string): void {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (rows.some((row) => row.name === column)) return;
+  db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`).run();
+}
 
 export type SourceState = 'trial' | 'active' | 'archived';
 
@@ -68,6 +131,12 @@ export interface SourceRow {
   ttl_hours: number | null;
   tags: string;
   notes: string;
+  owner: string | null;
+  trust_note: string | null;
+  intended_use: string | null;
+  warning: string | null;
+  last_reviewed_at: number | null;
+  promotion_reason: string | null;
   etag: string | null;
   last_modified: string | null;
   last_fetched: number | null;
@@ -90,6 +159,44 @@ export interface LinkRow {
   last_fetched: number | null;
   last_error: string | null;
   position: number;
+}
+
+export interface SourceRefreshRow {
+  id: number;
+  source_id: number;
+  started_at: number;
+  finished_at: number | null;
+  status: 'pending' | 'ok' | 'not_modified' | 'error';
+  http_status: number | null;
+  error: string | null;
+  previous_title: string | null;
+  previous_summary: string | null;
+  next_title: string | null;
+  next_summary: string | null;
+  previous_link_count: number | null;
+  next_link_count: number | null;
+  added_link_count: number | null;
+  removed_link_count: number | null;
+  changed_link_count: number | null;
+}
+
+export interface LinkRefreshRow {
+  id: number;
+  link_id: number | null;
+  source_id: number;
+  url: string;
+  started_at: number;
+  finished_at: number | null;
+  status: 'pending' | 'ok' | 'not_modified' | 'error';
+  http_status: number | null;
+  error: string | null;
+  previous_cache_hash: string | null;
+  cache_hash: string | null;
+  content_type: string | null;
+  etag: string | null;
+  last_modified: string | null;
+  bytes: number | null;
+  changed: number;
 }
 
 export const cachePath = (hash: string) => path.join(CACHE_DIR, `${hash}.md`);

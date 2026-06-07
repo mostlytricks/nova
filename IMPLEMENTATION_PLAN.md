@@ -363,6 +363,8 @@ Return the same shape as `docs-import check --json`.
 
 ## Phase 4 — Read-Only Agent View
 
+Status: **implemented 2026-06-06** in `server/routes/agent.ts`, `ui/components/AgentView.tsx`, `ui/App.tsx`, `ui/api.ts`, and `ui/components/Sidebar.tsx`.
+
 ### Goal
 
 Expose a simple read-only view that helps humans copy the right URLs into coding agents.
@@ -396,9 +398,10 @@ GET /api/agent/index
 
 ### Verification
 
-- Run `pnpm typecheck`.
-- Start `pnpm dev`.
-- Verify copyable URLs match actual routes.
+- `pnpm typecheck` passes.
+- `pnpm build` passes when run outside the sandbox so Vite/esbuild can spawn.
+- `GET /api/agent/index` returns master, merged, namespace, health, active-source, and snippet data.
+- `GET /agent` serves the built UI.
 
 ### Done Criteria
 
@@ -408,6 +411,8 @@ GET /api/agent/index
 ---
 
 ## Phase 5 — Trust Metadata For External Sources
+
+Status: **implemented 2026-06-06** in `server/db.ts`, `server/routes/sources.ts`, `server/routes/agent.ts`, `ui/api.ts`, `ui/components/SourceView.tsx`, `ui/components/Dashboard.tsx`, and `ui/styles.css`.
 
 ### Goal
 
@@ -434,13 +439,17 @@ Existing fields like `tags`, `notes`, `state`, and `ttl_hours` should remain.
 
 ### Verification
 
-- Run `pnpm typecheck`.
-- Exercise source create, patch, promote, archive flows.
-- Confirm existing sources still load with nullable new fields.
+- `pnpm typecheck` passes.
+- `pnpm build` passes when run outside the sandbox so Vite/esbuild can spawn.
+- Existing sources load with nullable trust fields.
+- Reversible source PATCH verified `owner`, `trust_note`, `intended_use`, `warning`, `last_reviewed_at`, and `promotion_reason`.
+- `/api/agent/index` includes trust metadata for active external sources.
 
 ---
 
 ## Phase 6 — Snapshot And Refresh History
+
+Status: **implemented 2026-06-07** in `server/db.ts`, `server/fetcher/source.ts`, `server/routes/sources.ts`, `ui/api.ts`, `ui/components/SourceView.tsx`, and `ui/styles.css`.
 
 ### Goal
 
@@ -465,38 +474,50 @@ GET /api/links/:id/history
 
 Rollback can be a later slice.
 
+### Verification
+
+- `pnpm typecheck` passes.
+- `pnpm build` passes when run outside the sandbox so Vite/esbuild can spawn.
+- `GET /api/sources/:id/history` returns source refresh records.
+- `GET /api/links/:id/history` returns link refresh records.
+
 ---
 
 ## Phase 7 — Basic Write Protection
 
-### Goal
+Status: **done 2026-06-07.** Implemented as a shared bearer-token check in `server/write-protect.ts`, applied to mutating handlers in `server/routes/{entries,llms,sources}.ts`. Reads stay open by default; write protection only activates when `WRITE_TOKEN` is set.
 
-Keep read endpoints simple on the intranet while making writes protectable.
+### Resolved decisions
 
-### First Version
+- [x] **Single shared `WRITE_TOKEN`, not per-user auth.** One static token in env, checked as `Authorization: Bearer <token>`. No accounts/sessions.
+- [x] **Protect mutating handlers only.** Read endpoints remain open.
+- [x] **Read-only POSTs stay open only where they truly do not mutate state.** `POST /api/sources/probe` remains open; `POST /api/llms/own/regenerate` is gated because it rewrites state.
+- [x] **UI writes are not token-aware yet.** The API gate is in place; if `WRITE_TOKEN` is set, callers must send the bearer themselves.
 
-- Env var: `WRITE_TOKEN`.
-- If unset, preserve current behavior.
-- If set, mutating endpoints require:
+### Implementation note
 
-```http
-Authorization: Bearer <token>
-```
+The code uses route-local guards instead of a single global `onRequest` hook. That keeps the blast radius narrow for this phase and still protects every mutating endpoint we ship today:
 
-### Protected Operations
-
-- Create/update/delete own entries.
-- Create/delete namespaces.
-- Save master or namespace `llms.txt`.
-- Add/patch/delete/refresh sources.
-- Refresh individual links.
-- Future split endpoint, if added.
+- `PUT /api/entries`
+- `DELETE /api/entries`
+- `PUT /api/llms/own`
+- `POST /api/llms/own/regenerate`
+- `PUT /api/namespaces/:name/note`
+- `POST /api/namespaces`
+- `DELETE /api/namespaces/:name`
+- `PUT /api/namespaces/:name/llms`
+- `POST /api/sources`
+- `PATCH /api/sources/:id`
+- `DELETE /api/sources/:id`
+- `POST /api/sources/:id/refresh`
+- `POST /api/links/:id/refresh`
 
 ### Verification
 
-- Run `pnpm typecheck`.
-- Test with no token: current behavior remains.
-- Test with token: reads work, writes fail without token, writes pass with token.
+1. `pnpm typecheck`
+2. `pnpm build`
+3. `PUT /api/entries` without `Authorization` returns `401` and `WWW-Authenticate: Bearer`
+4. `PUT /api/entries` with `Authorization: Bearer <token>` returns `200`
 
 ---
 
@@ -532,10 +553,10 @@ Agents should work in this order unless the user explicitly redirects:
 1. Phase 1 docs-split CLI.
 2. Phase 2 health checks.
 3. Phase 3 dashboard health signals.
-4. Phase 4 read-only agent view.
-5. Phase 5 trust metadata.
-6. Phase 6 refresh history.
-7. Phase 7 write protection.
+4. Phase 4 read-only agent view. **Done.**
+5. Phase 5 trust metadata. **Done.**
+6. Phase 6 refresh history. **Done.**
+7. Phase 7 write protection. **Done.**
 8. Phase 8 search.
 
 For each phase:
@@ -550,4 +571,4 @@ For each phase:
 
 ## Immediate Next Step
 
-Implement **Phase 4 — Read-Only Agent View**, starting with a simple read-only route/page that shows the URLs agents should use.
+Implement **Phase 8 — Search**, starting with a fast read-only search endpoint over own content, namespaces, and cached source metadata.

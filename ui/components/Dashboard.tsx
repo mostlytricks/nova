@@ -213,10 +213,19 @@ function SourceCard({
               <> · {source.linkCount} {source.linkCount === 1 ? 'link' : 'links'}</>
             )}
             {source.last_fetched && <> · fetched {ago(source.last_fetched)}</>}
+            {source.last_reviewed_at && <> · reviewed {ago(source.last_reviewed_at)}</>}
             {source.last_error && <span className="error"> · error</span>}
           </div>
         </div>
       </div>
+      {(source.owner || source.intended_use || source.trust_note || source.warning) && (
+        <div className={`trust-summary ${source.warning ? 'warn' : ''}`}>
+          {source.owner && <div><strong>Owner:</strong> {source.owner}</div>}
+          {source.intended_use && <div><strong>Use:</strong> {source.intended_use}</div>}
+          {source.trust_note && <div><strong>Trust:</strong> {source.trust_note}</div>}
+          {source.warning && <div className="error"><strong>Warning:</strong> {source.warning}</div>}
+        </div>
+      )}
       {source.summary && <div className="card-summary">{source.summary}</div>}
       <NoteEditor
         value={source.notes ?? ''}

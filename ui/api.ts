@@ -7,6 +7,12 @@ export interface Source {
   ttl_hours: number | null;
   tags: string[];
   notes: string;
+  owner: string | null;
+  trust_note: string | null;
+  intended_use: string | null;
+  warning: string | null;
+  last_reviewed_at: number | null;
+  promotion_reason: string | null;
   last_fetched: number | null;
   last_accessed: number | null;
   last_error: string | null;
@@ -26,6 +32,44 @@ export interface Link {
   last_fetched: number | null;
   last_error: string | null;
   position: number;
+}
+
+export interface SourceRefreshRecord {
+  id: number;
+  source_id: number;
+  started_at: number;
+  finished_at: number | null;
+  status: 'pending' | 'ok' | 'not_modified' | 'error';
+  http_status: number | null;
+  error: string | null;
+  previous_title: string | null;
+  previous_summary: string | null;
+  next_title: string | null;
+  next_summary: string | null;
+  previous_link_count: number | null;
+  next_link_count: number | null;
+  added_link_count: number | null;
+  removed_link_count: number | null;
+  changed_link_count: number | null;
+}
+
+export interface LinkRefreshRecord {
+  id: number;
+  link_id: number | null;
+  source_id: number;
+  url: string;
+  started_at: number;
+  finished_at: number | null;
+  status: 'pending' | 'ok' | 'not_modified' | 'error';
+  http_status: number | null;
+  error: string | null;
+  previous_cache_hash: string | null;
+  cache_hash: string | null;
+  content_type: string | null;
+  etag: string | null;
+  last_modified: string | null;
+  bytes: number | null;
+  changed: number;
 }
 
 export interface NamespaceHealthIssue {
@@ -86,6 +130,12 @@ export interface AgentIndex {
     id: number;
     title: string;
     url: string;
+    owner: string | null;
+    trustNote: string | null;
+    intendedUse: string | null;
+    warning: string | null;
+    lastReviewedAt: number | null;
+    promotionReason: string | null;
     lastFetched: number | null;
     lastError: string | null;
   }[];
@@ -110,6 +160,8 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   listSources: () => json<Source[]>('/api/sources'),
   getSource: (id: number) => json<{ source: Source; links: Link[] }>(`/api/sources/${id}`),
+  getSourceHistory: (id: number) =>
+    json<{ source: Source; refreshes: SourceRefreshRecord[] }>(`/api/sources/${encodeURIComponent(id)}/history`),
   probe: (url: string) =>
     json<{ ok: boolean; doc: any; raw: string; error?: string }>('/api/sources/probe', {
       method: 'POST',
@@ -130,6 +182,8 @@ export const api = {
     json<{ ok: true }>(`/api/links/${id}/refresh`, { method: 'POST' }),
   linkContent: (id: number) =>
     fetch(`/api/links/${id}/content`).then((r) => (r.ok ? r.text() : Promise.reject(r.statusText))),
+  getLinkHistory: (id: number) =>
+    json<{ link: Link; refreshes: LinkRefreshRecord[] }>(`/api/links/${encodeURIComponent(id)}/history`),
   listEntries: () => json<{ entries: string[] }>('/api/entries'),
   getEntry: (name: string) =>
     json<{ name: string; content: string }>(`/api/entries/get?name=${encodeURIComponent(name)}`),

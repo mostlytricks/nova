@@ -5,6 +5,7 @@ import {
   writeOwnEntry,
   deleteOwnEntry,
 } from '../own.js';
+import { requireWriteAccess } from '../write-protect.js';
 
 export async function registerEntriesRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/entries', async () => {
@@ -22,6 +23,7 @@ export async function registerEntriesRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.put<{ Body: { name: string; content: string } }>('/api/entries', async (req, reply) => {
+    if (!requireWriteAccess(req, reply)) return;
     const { name, content } = req.body ?? ({} as any);
     if (!name || content === undefined) return reply.code(400).send({ error: 'name + content required' });
     try {
@@ -33,6 +35,7 @@ export async function registerEntriesRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.delete<{ Querystring: { name?: string } }>('/api/entries', async (req, reply) => {
+    if (!requireWriteAccess(req, reply)) return;
     const name = req.query.name;
     if (!name) return reply.code(400).send({ error: 'name required' });
     try {

@@ -12,11 +12,11 @@
 <title>local-llmstxt-server — Project mission</title>
 <style>
   :root {
-    --bg:#0f1413; --panel:#171d1c; --panel-2:#1d2423; --line:#2a3331;
-    --text-hi:#eef2f1; --text:#cbd3d1; --text-mid:#94a09d; --faint:#69736f;
-    --accent:#62a89f; --accent-d:#4f978e; --blue:#7ea6c4; --amber:#d9b27a; --red:#d98c7a;
-    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --bg:#0A0E1A; --panel:rgba(17,24,43,0.66); --panel-2:rgba(26,36,64,0.55); --line:rgba(255,255,255,0.09);
+    --text-hi:#F3F4F6; --text:#cdd3e0; --text-mid:#9CA3AF; --faint:#717a8c;
+    --accent:#34e3e6; --accent-d:#00E5E8; --blue:#4FACFE; --amber:#FBBF24; --red:#FF4D6D;
+    --mono:'Fira Code',ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:'Inter',ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
   * { box-sizing:border-box; }
   html { scroll-behavior:smooth; }
@@ -83,6 +83,34 @@
     color:var(--faint); font-size:12.5px;
   }
   @media (max-width:680px){ .toc ol { columns:1; } }
+
+  /* ===== aurora doc theme (dashboard-matched) — appended; later rules win, custom CSS above preserved ===== */
+  body {
+    background:
+      radial-gradient(900px 520px at 10% -8%, rgba(0,242,254,.10), transparent 60%),
+      radial-gradient(820px 480px at 96% -2%, rgba(240,147,251,.08), transparent 55%),
+      radial-gradient(700px 600px at 50% 120%, rgba(0,229,232,.06), transparent 60%),
+      var(--bg);
+    background-attachment:fixed; line-height:1.7;
+  }
+  h1 {
+    font-family:'Outfit',var(--sans); font-weight:700; letter-spacing:-.02em;
+    background:linear-gradient(135deg,#4FACFE,#F093FB);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .logo .sq {
+    background:linear-gradient(135deg,#00A3A6,#00E5E8);
+    box-shadow:0 0 14px -1px rgba(0,229,232,.85);
+  }
+  h2 .n, .toc a:hover, a:hover { color:var(--accent-d); }
+  pre, .toc, .note, .card, .phase {
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    box-shadow:0 8px 32px rgba(0,0,0,.22);
+  }
+  .card { transition:transform .25s cubic-bezier(.4,0,.2,1), border-color .25s, box-shadow .25s; }
+  .card:hover { transform:translateY(-4px); border-color:var(--accent); box-shadow:0 12px 40px rgba(0,242,254,.15); }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;} }
+
 </style>
 </head>
 <body>
