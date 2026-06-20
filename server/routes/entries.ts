@@ -5,6 +5,7 @@ import {
   writeOwnEntry,
   deleteOwnEntry,
 } from '../own.js';
+import { appendNamespaceHistory, namespaceFromEntryName } from '../namespace-meta.js';
 import { requireWriteAccess } from '../write-protect.js';
 
 export async function registerEntriesRoutes(app: FastifyInstance): Promise<void> {
@@ -28,6 +29,8 @@ export async function registerEntriesRoutes(app: FastifyInstance): Promise<void>
     if (!name || content === undefined) return reply.code(400).send({ error: 'name + content required' });
     try {
       writeOwnEntry(name, content);
+      const namespace = namespaceFromEntryName(name);
+      if (namespace) appendNamespaceHistory(namespace, 'entry_saved', `${name} saved`);
       return { ok: true };
     } catch (e) {
       return reply.code(400).send({ error: e instanceof Error ? e.message : 'failed' });
@@ -39,7 +42,9 @@ export async function registerEntriesRoutes(app: FastifyInstance): Promise<void>
     const name = req.query.name;
     if (!name) return reply.code(400).send({ error: 'name required' });
     try {
+      const namespace = namespaceFromEntryName(name);
       deleteOwnEntry(name);
+      if (namespace) appendNamespaceHistory(namespace, 'entry_deleted', `${name} deleted`);
       return { ok: true };
     } catch (e) {
       return reply.code(400).send({ error: e instanceof Error ? e.message : 'failed' });

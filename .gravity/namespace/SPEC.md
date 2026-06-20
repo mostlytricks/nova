@@ -1,6 +1,6 @@
-# SPEC.dev-docs-llms-txt.md
+# SPEC — namespace (output contract)
 
-Canonical references: the [llmstxt.org spec](https://llmstxt.org/) (the format) and `MISSION.html` §04 (the "originals immutable; namespaces are views" seam). This file is the **project-local contract** for what a *good dev/API* `llms.txt` namespace looks like — the requirements an authoring agent loads before composing one.
+Canonical references: the [llmstxt.org spec](https://llmstxt.org/) (the format) and `../MISSION.html` §04 (the "originals immutable; namespaces are views" seam). This file is the **project-local contract** for what a *good dev/API* `llms.txt` namespace looks like — the requirements an authoring agent loads before composing one.
 
 This is the compact, agent-loadable rule sheet for producing `data/own/<ns>/` documentation that this server serves to coding agents. Keep it short and checkable. The `docs-import` and `llms-compose` skills are the *procedures*; this is the *contract* both must satisfy. When they disagree with this file, this file wins.
 
@@ -10,12 +10,40 @@ Verified by hand today (no linter yet): run `pnpm docs-import check <ns>` after 
 
 ## Core Definition
 
-A **namespace** is one agent-ready documentation unit the server serves. A valid namespace is:
+A **Local Docs namespace** is one agent-ready documentation unit the server serves. It should describe a specific website, API, library, service, or product that agents may need to use. A valid namespace is:
 
 - `data/own/<ns>/llms.txt` — the **manifest**: an H1 title, a one-line summary blockquote, a provenance line, and one or more `##` sections of link lines.
 - One or more `<topic>.md` **entry files** the manifest links to — clean, normalized markdown holding the actual content.
 
 The manifest is an *index for selection* (an agent reads it to decide *what to fetch*); entry files are the *payload*. A namespace is "good" when an agent can pick the right entry from the manifest alone and the fetched entry fits usefully in context.
+
+## Local Docs Profiles
+
+Choose one profile before composing files. If the material mixes profiles, split it into sibling namespaces unless the product is genuinely one integrated surface.
+
+### Website / Product Docs
+
+Use for a specific website, web app, SaaS console, internal tool, or documentation site. A strong website namespace usually has:
+
+- `overview.md`: what the site/app is, audience, source/provenance, key domains.
+- `navigation.md`: important routes/pages, entry points, and where tasks happen.
+- `workflows.md`: common user or agent workflows in task order.
+- `concepts.md`: domain objects and vocabulary.
+- `integration-notes.md` or `caveats.md`: login/session behavior, environment assumptions, limitations, known traps.
+
+Manifest sections should be task-oriented: `Start Here`, `Workflows`, `Reference`, `Caveats`. Link descriptions must say when an agent should fetch each page.
+
+### API Docs
+
+Use for REST, GraphQL, RPC, SDK-backed services, or internal APIs. A strong API namespace usually has:
+
+- `overview.md`: product/API purpose, version, base URL, resource model, audience.
+- `auth.md`: auth scheme documented exactly once.
+- One resource file per meaningful resource/tag, such as `orders.md` or `customers.md`.
+- `schemas.md` when shared objects are complex or reused across resources.
+- `errors.md`: status codes, error shape, idempotency, rate limits, retry behavior.
+
+Manifest sections should expose `Start Here` and `Reference`. Resource files should group endpoints by resource/tag, not emit one tiny file per endpoint.
 
 `<ns>` matches `^[a-z0-9][a-z0-9-]*$` and may contain `--` (used for splits, e.g. `langchain--core`).
 
@@ -81,13 +109,17 @@ A good dev/API namespace needs the fields below. When the input (a pptx, a paste
 | Field | Lives in | Ask when missing |
 |---|---|---|
 | Product / API name | manifest H1 | always confirm |
+| Local Docs profile | namespace metadata + authoring plan | ask whether this is `website`, `api`, `library`, or `notes` |
 | One-line summary | summary blockquote | usually missing from raw material |
 | Source / provenance + date | provenance blockquote | always (date is system; origin from operator) |
+| Origin URL or source file | provenance blockquote or metadata | ask when source material came from a website, portal, file, deck, or paste |
 | **Base URL / servers** | provenance or `auth.md` | often missing from slides — **ask** |
 | **Auth scheme** | `auth.md` | often missing — **ask** |
+| Version / environment | manifest provenance or `overview.md` | ask for API version, website environment, or product release when relevant |
 | Section grouping | `##` headings | agent proposes, operator confirms |
 | Per-entry descriptions | link lines | agent drafts from content |
-| Intended use / audience / warnings | operator note (feeds source trust metadata) | always — **ask** |
+| Intended use / audience / warnings | namespace metadata + operator note | always — **ask** |
+| Known gaps | namespace metadata or `overview.md` caveat | ask what is intentionally missing or uncertain |
 
 ## Quality Gate
 
@@ -99,6 +131,8 @@ Before declaring a namespace done, all must hold (most are checked by `pnpm docs
 - [ ] No raw HTML tags and no marketing/chrome fragments in any entry.
 - [ ] Every link line has a description.
 - [ ] For APIs: base URL present, auth documented once, no invented example values.
+- [ ] For websites/apps: important routes, workflows, login/session caveats, and domain concepts are represented.
+- [ ] Metadata captures profile, intended use, owner/reviewer when known, warnings, and known gaps.
 - [ ] No orphan `.md` files in the namespace that the manifest doesn't link.
 - [ ] Provenance date is today's real date.
 
@@ -112,4 +146,4 @@ Before declaring a namespace done, all must hold (most are checked by `pnpm docs
 
 ---
 
-Procedures that satisfy this contract: the `docs-import` skill (URL/CLI ingestion) and the `llms-compose` skill (agent-read arbitrary material — pptx, paste, local files). The *why* behind the seam lives in `MISSION.html`; the format authority is [llmstxt.org](https://llmstxt.org/).
+Procedures that satisfy this contract: the `docs-import` skill (URL/CLI ingestion) and the `llms-compose` skill (agent-read arbitrary material — pptx, paste, local files). The *why* behind the seam lives in `../MISSION.html`; the format authority is [llmstxt.org](https://llmstxt.org/).

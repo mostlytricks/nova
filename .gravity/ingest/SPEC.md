@@ -1,8 +1,8 @@
-# SPEC.ingest-router.md
+# SPEC — ingest (front-door router)
 
-Canonical references: `SPEC.dev-docs-llms-txt.md` (what a good output is), and the `docs-import` / `llms-compose` skills (the two procedures). This file is the **front door**: given *any* input, it decides which lane handles it. Both skills load it first.
+Canonical references: `../namespace/SPEC.md` (what a good output is), and the `docs-import` / `llms-compose` skills (the two procedures). This file is the **front door**: given *any* input, it decides which lane handles it. Both skills load it first. Why this domain exists → `../MISSION.html` §04 (the immutable-originals seam).
 
-The output contract is always the same — a namespace under `data/own/<ns>/` that satisfies `SPEC.dev-docs-llms-txt.md`. Only the *ingestion path* differs.
+The output contract is always the same — a namespace under `data/own/<ns>/` that satisfies `../namespace/SPEC.md`. Only the *ingestion path* differs.
 
 ## The two lanes
 
@@ -35,7 +35,7 @@ Try the rungs in order; stop at the first that yields real content:
 
 ## Mixed inputs
 
-A deck **plus** a swagger URL, or prose pages **plus** an OpenAPI spec: run each part through its lane (`docs-import openapi` for the spec, `llms-compose` for the deck), then merge into one namespace. The merge still has to satisfy `SPEC.dev-docs-llms-txt.md` (one auth home, base URL present, descriptions on every link).
+A deck **plus** a swagger URL, or prose pages **plus** an OpenAPI spec: run each part through its lane (`docs-import openapi` for the spec, `llms-compose` for the deck), then merge into one namespace. The merge still has to satisfy `../namespace/SPEC.md` (one auth home, base URL present, descriptions on every link).
 
 ## Gotchas
 
@@ -46,4 +46,4 @@ A deck **plus** a swagger URL, or prose pages **plus** an OpenAPI spec: run each
 
 ---
 
-Output requirements live in `SPEC.dev-docs-llms-txt.md`. Procedures live in the `docs-import` and `llms-compose` skills. The *why* (immutable originals, human-curated trust) lives in `MISSION.html`.
+Output requirements live in `../namespace/SPEC.md`. Procedures live in the `docs-import` and `llms-compose` skills. The *why* (immutable originals, human-curated trust) lives in `../MISSION.html`.

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { db, type SourceRow, type LinkRow, type SourceRefreshRow, type LinkRefreshRow } from '../db.js';
 import { probeSource, refreshSource, refreshLink } from '../fetcher/source.js';
+import { serializeLlmsTxt, type LlmsDoc } from '../parser.js';
 import { requireWriteAccess } from '../write-protect.js';
 
 export async function registerSourcesRoutes(app: FastifyInstance): Promise<void> {
@@ -36,6 +37,14 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
       )
       .all(id) as SourceRefreshRow[];
     return { source: formatSource(source), refreshes };
+  });
+
+  app.get<{ Params: { id: string } }>('/api/sources/:id/llms', async (req, reply) => {
+    const id = Number(req.params.id);
+    const source = db.prepare('SELECT * FROM sources WHERE id = ?').get(id) as SourceRow | undefined;
+    if (!source) return reply.code(404).send({ error: 'not found' });
+    reply.header('content-type', 'text/markdown; charset=utf-8');
+    return serializeLlmsTxt(sourceManifest(source));
   });
 
   app.post<{ Body: { url: string } }>('/api/sources/probe', async (req, reply) => {
@@ -225,6 +234,28 @@ function formatSource(s: SourceRow) {
     last_accessed: s.last_accessed,
     last_error: s.last_error,
     created_at: s.created_at,
+  };
+}
+
+function sourceManifest(source: SourceRow): LlmsDoc {
+  const links = db.prepare('SELECT * FROM links WHERE source_id = ? ORDER BY position').all(source.id) as LinkRow[];
+  const sectionMap = new Map<string, LinkRow[]>();
+  for (const link of links) {
+    const section = link.section ?? 'Docs';
+    if (!sectionMap.has(section)) sectionMap.set(section, []);
+    sectionMap.get(section)!.push(link);
+  }
+  return {
+    title: source.title ?? source.url,
+    summary: source.summary ?? undefined,
+    sections: [...sectionMap.entries()].map(([name, sectionLinks]) => ({
+      name,
+      links: sectionLinks.map((link) => ({
+        title: link.title ?? link.url,
+        url: link.url,
+        description: link.description ?? undefined,
+      })),
+    })),
   };
 }
 

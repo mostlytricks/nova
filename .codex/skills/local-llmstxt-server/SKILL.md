@@ -12,17 +12,17 @@ Use this skill only for this repository.
 At the start of a project task, read these files in order:
 
 1. `CONTEXT.md` - current state, dirty worktree expectations, next step.
-2. `IMPLEMENTATION_PLAN.md` - durable roadmap and phase rules.
-3. `MISSION.html` - product mission and non-negotiable design constraints.
+2. `.gravity/IMPLEMENTATION_PLAN.md` - durable roadmap and phase rules.
+3. `.gravity/MISSION.html` - product mission and non-negotiable design constraints.
 4. `CLAUDE.md` - local project conventions, if relevant.
 
 For ingestion/import work, also read:
 
-- `SPEC.ingest-router.md` - input routing and CSR/SPA ladder.
-- `SPEC.dev-docs-llms-txt.md` - output contract for good dev/API namespaces.
-- `.claude/skills/docs-import/SKILL.md` - URL/CLI import procedure.
-- `.claude/skills/llms-compose/SKILL.md` - local-material compose procedure.
-- `.claude/skills/llms-txt-reader/SKILL.md` - selective manifest consumption procedure.
+- `.gravity/ingest/SPEC.md` - input routing and CSR/SPA ladder.
+- `.gravity/namespace/SPEC.md` - output contract for good dev/API namespaces.
+- `.codex/skills/docs-import/SKILL.md` - URL/CLI import procedure.
+- `.codex/skills/llms-compose/SKILL.md` - local-material compose procedure.
+- `.codex/skills/llms-txt-reader/SKILL.md` - selective manifest consumption procedure.
 
 ## Project Shape
 
@@ -77,10 +77,10 @@ For URL inputs:
 
 1. Run `pnpm docs-import probe <url>`.
 2. Check `rendering` first.
-3. If `rendering: "csr"`, follow `SPEC.ingest-router.md`: markdown twin, then `fetch-clean --render`, then operator paste into `llms-compose`.
+3. If `rendering: "csr"`, follow `.gravity/ingest/SPEC.md`: markdown twin, then `fetch-clean --render`, then operator paste into `llms-compose`.
 4. If `rendering: "ssr"`, branch by `kind`: `openapi`, `llmstxt`, `sitemap`, `nav`, or `single`.
 
-For local material (pptx, PDF, pasted text, local markdown), use the `llms-compose` procedure and the dev-docs spec. Missing API metadata is a question, never an invention.
+For local material (pptx, PDF, pasted text, local markdown), use the `llms-compose` procedure and the Local Docs spec. Missing profile metadata, API base URLs, auth, versions, and known gaps are questions, never inventions.
 
 ## Search Phase Guidance
 

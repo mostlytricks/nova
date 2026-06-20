@@ -4,24 +4,31 @@ Internal-network server that hosts your own `llms.txt` (with namespaced sub-mani
 
 ---
 
-## Docs in this project
+## Doc Map (`.gravity/`)
 
-<!-- Read top-to-bottom. One concern, one owner — link, don't restate.
-     Precedence on conflict: CONTEXT (now) > CLAUDE (how) > PLAN (next) > MISSION (why). -->
+> This `CLAUDE.md` (identity, *how*) + `CONTEXT.md` (*now*) stay at the root and auto-load; `README.md` is the user guide. The *why / what-next / how-it's-built* live under **`.gravity/`**, organized by subject domain. One concern, one owner — link, don't restate. Precedence on conflict: CONTEXT (now) > CLAUDE (how) > PLAN (next) > MISSION (why).
 
-- **CONTEXT.md** — start here: current state + the single next step. *Now.*
-- **CLAUDE.md** (this file) — stable identity: stack, run/test, entry points, gotchas. *How.*
-- **IMPLEMENTATION_PLAN.md** — phases & locked decisions. *What's next* (may lag; CONTEXT wins on "now").
-- **MISSION.html** — why it exists, principles, non-goals. *Why* (browser-read).
-- **`docs/walkthroughs/*.md`** — dated, append-only proof-of-work records for shipped slices (present: see `docs/walkthroughs/`). *Optional; CONTEXT.md "Completed" links here.*
+```
+.gravity/
+  MISSION.html              # why — north star, principles, non-goals, the §04 "immutable originals; namespaces are views" seam (browser-read)
+  ARCHITECTURE.html         # how — operator/agent system map: roles, ingestion paths, namespace shape, serving URLs, trust/state (browser-read)
+  IMPLEMENTATION_PLAN.md    # what/next — the 8-phase control-plane roadmap + per-domain status spine
+  ingest/     SPEC.md       # front door: any input → which ingestion lane (docs-import vs llms-compose), the CSR/SPA ladder
+  namespace/  SPEC.md       # output contract: what a good dev/API llms.txt namespace must satisfy
+```
 
-No `ARCHITECTURE.html` — "how it's built" lives in this file's **Entry Points** section.
+`docs/walkthroughs/*.md` — dated, append-only proof-of-work for shipped slices (CONTEXT.md "Completed" links here).
 
-## Skills & ingestion SPECs (the agent router)
+## What to read before a change (router)
 
-`.claude/skills/*` are task playbooks for an agent working *with* this server; the two repo-root `SPEC.*.md` files are the contracts those skills obey. **Read the SPEC before running the matching skill.** One concern, one home — the skills are *procedures*, the SPECs are *requirements*; link, don't restate.
+Before touching a domain, load its `.gravity/<domain>/SPEC.md` — the compact agent contract. `ARCHITECTURE.html` is the human reference behind it (read for the full rationale).
 
-**Front door:** `SPEC.ingest-router.md` decides which lane handles a given input (URL vs local material vs CSR/SPA). Start there for any ingest task.
+| If you're changing… | Read first | Human reference |
+|---|---|---|
+| ingest routing — input → lane, the probe contract, the CSR/SPA ladder | `.gravity/ingest/SPEC.md` | `.gravity/ARCHITECTURE.html` §03 |
+| what a produced `llms.txt` namespace must satisfy (manifest/entry rules, API auth-once, "don't invent — ask") | `.gravity/namespace/SPEC.md` | `.gravity/ARCHITECTURE.html` §04 |
+
+**Skills are the procedures; the two SPECs are the contracts they obey** — read the matching SPEC before running a skill. **Front door:** `.gravity/ingest/SPEC.md` decides which lane handles a given input (URL vs local material vs CSR/SPA), including the 3-rung ladder (markdown twin → headless render → operator paste). A login/CA-walled page is a fourth path: `cookie-extract` + `windows-ca-web-fetch` get the bytes, then a producer skill ingests them.
 
 | Skill | Role | Use when |
 |---|---|---|
@@ -31,9 +38,9 @@ No `ARCHITECTURE.html` — "how it's built" lives in this file's **Entry Points*
 | `cookie-extract` | **Protected-source fetch** | A target page sits behind a login/SSO. HITL: opens a headed browser, user logs in, extracts session cookies. Uses Playwright (same dep family as the render rung). |
 | `windows-ca-web-fetch` | **Protected-source fetch** | A URL needs a corporate/private CA bundle, `Authorization` header, or session cookies. Windows `curl.exe` wrapper. Pairs with `cookie-extract` to feed a producer skill. |
 
-**SPEC contracts:**
-- `SPEC.ingest-router.md` — front door: input → lane, plus the 3-rung CSR/SPA ladder (markdown twin → headless render → operator paste). A login/CA-walled page is effectively a fourth path: `cookie-extract` + `windows-ca-web-fetch` get the bytes, then a producer skill ingests them.
-- `SPEC.dev-docs-llms-txt.md` — the output contract + quality gate every produced namespace must satisfy (manifest/entry rules, base-URL/auth-once for APIs, "don't invent — ask"). Both producer skills defer to it.
+## Adding a domain (start here for a new feature)
+
+A **domain** is a durable subject area an agent repeatedly navigates and changes — not every feature is one. Mint a `.gravity/<domain>/` folder only when the feature has its own *gravity* (its own principle + non-goal, rules worth a `SPEC.md`, a multi-step arc). If it fails that gate, it's a `PLAN.*.md` slice under an existing domain (`ingest`/`namespace`), not a new folder. When you do add one, **wire all four indexes so it's never orphaned**: this Doc Map, the router table above, a `.gravity/MISSION.html` "system in N domains" row, and the `.gravity/IMPLEMENTATION_PLAN.md` status spine. Start minimal — usually just `PLAN.md` day one; add `SPEC.md`/`ARCHITECTURE.html` as they earn it. `/new-domain local-llmstxt-server <domain>` does the wiring. (Workspace CLAUDE.md §6.)
 
 ## Stack
 
@@ -86,7 +93,7 @@ No tests yet. Verify changes by running `pnpm typecheck` (covers both `tsconfig.
 - **`data/cache/` and `data/index.sqlite` are regenerable** — fine to delete during debugging. `data/own/` is the source of truth and should be git-tracked once you have content worth keeping.
 - **White page at `localhost:5173`** typically means a stale `node` is holding the port and Vite quietly bound to `5174`. README has the kill-port recipe.
 - **`.claude/` directory at the repo root** holds local Claude Code config — already covered by `.gitignore`.
-- **`IMPLEMENTATION_PLAN.md`** at the repo root is the 8-phase control-plane roadmap (Phases 1–7 **done**; Phase 8 = Search queued) plus **Track R** (ingestion router & CSR/SPA handling — complete locally, pending commit). Read before changing how docs are split across namespaces, touching the ingest path, or starting a new phase.
+- **`.gravity/IMPLEMENTATION_PLAN.md`** is the 8-phase control-plane roadmap (Phases 1–7 **done**; Phase 8 = Search queued) plus **Track R** (ingestion router & CSR/SPA handling — complete locally, pending commit). Read before changing how docs are split across namespaces, touching the ingest path, or starting a new phase.
 
 ## Entry Points
 
@@ -96,9 +103,9 @@ No tests yet. Verify changes by running `pnpm typecheck` (covers both `tsconfig.
 - **UI entry:** `ui/main.tsx` → `ui/App.tsx`.
 - **Frontend ↔ backend contract:** `ui/api.ts` (typed fetch helpers, must stay in sync with `server/routes/*.ts`).
 - **Background work:** `server/fetcher/scheduler.ts`.
-- **Pipeline docs** (each owns one concern; link rather than restate — workspace CLAUDE.md §6):
-  - `MISSION.html` — the durable *why*: north star, product principles, the architecture seam (§04 "originals immutable; namespaces are views"), and current non-goals.
-  - `IMPLEMENTATION_PLAN.md` — the *what/next*: the 8-phase control-plane roadmap (Phases 1–7 done; Phase 8 next).
+- **Pipeline docs** (each owns one concern; link rather than restate — workspace CLAUDE.md §6; full layout in the Doc Map above):
+  - `.gravity/MISSION.html` — the durable *why*: north star, product principles, the architecture seam (§04 "originals immutable; namespaces are views"), and current non-goals.
+  - `.gravity/IMPLEMENTATION_PLAN.md` — the *what/next*: the 8-phase control-plane roadmap (Phases 1–7 done; Phase 8 next) + the per-domain status spine.
   - `CONTEXT.md` — the rolling *now*: current state + the single next step.
 
 ## Git

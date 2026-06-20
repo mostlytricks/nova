@@ -21,11 +21,12 @@ export function AgentView() {
       {index && (
         <>
           <div className="agent-grid">
-            <UrlPanel title="Master" label={index.master.label} url={index.master.absoluteUrl} />
+            <UrlPanel title="Agent" label={index.recommended.label} url={index.recommended.absoluteUrl} />
+            <UrlPanel title="Local" label={index.master.label} url={index.master.absoluteUrl} />
             <UrlPanel
-              title="Merged"
-              label={`${index.mergedExternal.label} (${index.mergedExternal.activeSourceCount} active)`}
-              url={index.mergedExternal.absoluteUrl}
+              title="Imported"
+              label={`${index.catalogs.sources.label} (${index.mergedExternal.activeSourceCount} active)`}
+              url={index.catalogs.sources.absoluteUrl}
             />
             {index.startHere && (
               <UrlPanel title="Start" label={index.startHere.title} url={index.startHere.absoluteUrl} />
@@ -45,7 +46,7 @@ export function AgentView() {
             ))}
           </div>
 
-          <h2 className="section-title">Namespaces</h2>
+          <h2 className="section-title">Local Docs</h2>
           <div className="card-list">
             {index.namespaces.map((namespace) => (
               <NamespaceRow key={namespace.name} namespace={namespace} />
@@ -54,7 +55,7 @@ export function AgentView() {
 
           {index.splitIndexes.length > 0 && (
             <>
-              <h2 className="section-title">Split Indexes</h2>
+              <h2 className="section-title">Split Local Docs</h2>
               <div className="card-list">
                 {index.splitIndexes.map((namespace) => (
                   <NamespaceRow key={namespace.name} namespace={namespace} />

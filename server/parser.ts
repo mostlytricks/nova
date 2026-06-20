@@ -48,7 +48,7 @@ export function parseLlmsTxt(input: string): LlmsDoc {
   //  - Everything else is preserved as `intro`.
   const introLines: string[] = [];
   let note: string | undefined;
-  while (i < lines.length && !/^##\s+/.test(lines[i])) {
+  while (i < lines.length && !/^##\s+/.test(lines[i]) && !LINK_RE.test(lines[i])) {
     if (lines[i].startsWith('>')) {
       const blockStart = i;
       const parts: string[] = [];
@@ -82,7 +82,11 @@ export function parseLlmsTxt(input: string): LlmsDoc {
       continue;
     }
     const linkMatch = lines[i].match(LINK_RE);
-    if (linkMatch && current) {
+    if (linkMatch) {
+      if (!current) {
+        current = { name: 'Docs', links: [] };
+        sections.push(current);
+      }
       current.links.push({
         title: linkMatch[1].trim(),
         url: linkMatch[2].trim(),

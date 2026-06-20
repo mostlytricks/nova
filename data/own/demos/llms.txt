@@ -1,8 +1,16 @@
-# demos
+# Demo Orders API
 
-> Example namespace — shows how to group a set of related docs under one llms.txt.
+> Golden Local Docs example for an internal orders API. Use this shape when composing API docs from an internal website, OpenAPI file, Confluence page, or operator-provided notes.
 
-## Overview
+> Source: synthetic project demo for local-llmstxt-server. Imported 2026-06-21. Base URL: https://orders.internal.example/v1. Auth: Bearer token, see auth.md.
 
-- [Overview](/api/entries/get?name=demos/overview.md): What this namespace is for
-- [Quick reference](/api/entries/get?name=demos/quick-ref.md): Cheat sheet
+## Start Here
+
+- [Overview](/api/entries/get?name=demos/overview.md): API scope, resource model, version, and when agents should use this doc set
+- [Authentication](/api/entries/get?name=demos/auth.md): Bearer token placement, scopes, token lifetime, and safe handling rules
+
+## Reference
+
+- [Customers](/api/entries/get?name=demos/customers.md): create and fetch customer records; identity fields and paging behavior
+- [Orders](/api/entries/get?name=demos/orders.md): create, fetch, cancel, and list orders; line-item shape and state transitions
+- [Errors and limits](/api/entries/get?name=demos/errors.md): HTTP errors, validation failures, idempotency behavior, and rate limits

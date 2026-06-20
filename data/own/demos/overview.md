@@ -1,15 +1,31 @@
 # Overview
 
-This is an example **namespace**: a folder under `data/own/` that contains its own `llms.txt` plus the markdown docs it references.
+The Demo Orders API is a synthetic Local Docs example that models how an internal API should be prepared for coding agents. It is not a real service. Its purpose is to show the expected shape for a high-quality `llms.txt` manifest and the linked markdown pages behind it.
 
-## Why namespaces?
+Use this doc set as the template when turning a specific website, API portal, OpenAPI file, Confluence page, or operator-provided internal note into Local Docs.
 
-- Each set of docs (one library, one API, one project) gets its own self-contained manifest.
-- Agents can be pointed at `/<namespace>/llms.txt` for a focused view.
-- The master `/llms.txt` indexes every namespace.
+## API identity
 
-## Editing
+| Field | Value |
+|---|---|
+| Product name | Demo Orders API |
+| Version | v1 |
+| Base URL | `https://orders.internal.example/v1` |
+| Audience | Coding agents implementing integrations, tests, or client wrappers |
+| Auth home | `auth.md` |
+| Source type | Synthetic demo material |
 
-- Edit this file freely in the UI or directly on disk at `data/own/demos/overview.md`.
-- Add new docs under `data/own/demos/` and link them from `data/own/demos/llms.txt`.
-- Use the **Regenerate from namespaces** button on the master llms.txt to refresh the top-level index.
+## Resource model
+
+The API exposes two primary resources:
+
+- Customers: buyer identity records used by orders.
+- Orders: purchase requests containing one or more line items.
+
+Orders reference customers by `customer_id`. A customer can have many orders. Orders move through a small lifecycle: `draft`, `submitted`, `fulfilled`, or `cancelled`.
+
+## Agent usage guidance
+
+Read this overview first when the task is broad. For any implementation task, fetch `auth.md` once, then fetch only the resource page that matches the task. For example, a task about cancelling an order should use `orders.md` and does not need the customer creation details unless the task also creates customers.
+
+Do not treat values in this demo as production credentials, production URLs, or proof that a real service exists. For real Local Docs, preserve the actual source wording and ask the operator before filling missing base URL, auth, or example payload details.

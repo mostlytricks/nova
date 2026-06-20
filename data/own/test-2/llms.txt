@@ -1,5 +1,0 @@
-# test-2
-
-> Docs for test-2.
-
-## Docs

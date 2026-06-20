@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, type NamespaceHealthReport, type Source } from './api';
+import { api, type LocalDocType, type ManagedDocState, type NamespaceHealthReport, type Source } from './api';
 import { Sidebar } from './components/Sidebar';
 import { LlmsTxtView } from './components/LlmsTxtView';
 import { EntryView } from './components/EntryView';
@@ -22,6 +22,23 @@ export interface Namespace {
   summary: string | null;
   note?: string | null;
   entryCount?: number;
+  state: ManagedDocState;
+  doc_type: LocalDocType;
+  origin_url: string | null;
+  base_url: string | null;
+  auth_summary: string | null;
+  version: string | null;
+  known_gaps: string | null;
+  tags: string[];
+  notes: string;
+  owner: string | null;
+  trust_note: string | null;
+  intended_use: string | null;
+  warning: string | null;
+  last_reviewed_at: number | null;
+  promotion_reason: string | null;
+  created_at: number;
+  updated_at: number;
   health?: NamespaceHealthReport;
 }
 
@@ -54,7 +71,6 @@ export function App() {
     <div className="layout">
       <Sidebar
         sources={sources}
-        entries={entries}
         namespaces={namespaces}
         selection={selection}
         onSelect={setSelection}
@@ -76,12 +92,20 @@ export function App() {
           <LlmsTxtView
             kind="namespace"
             namespace={selection.namespace}
+            entries={entries.filter((entry) => entry.startsWith(`${selection.namespace}/`))}
+            onSelect={setSelection}
+            onReload={reload}
             key={`ns-${selection.namespace}`}
           />
         )}
         {selection.kind === 'own-entry' && (
           <EntryView
             name={selection.name}
+            onSelect={setSelection}
+            onBack={() => {
+              const namespace = selection.name.split('/')[0];
+              setSelection(namespace && namespace !== selection.name ? { kind: 'namespace-llms', namespace } : { kind: 'own-llms' });
+            }}
             onChanged={reload}
             onDeleted={() => { setSelection({ kind: 'own-llms' }); reload(); }}
           />

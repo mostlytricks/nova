@@ -18,6 +18,9 @@ export function SourceView({
   const [contentErr, setContentErr] = useState<string | null>(null);
   const [sourceHistory, setSourceHistory] = useState<SourceRefreshRecord[]>([]);
   const [linkHistory, setLinkHistory] = useState<LinkRefreshRecord[]>([]);
+  const [tab, setTab] = useState<'llms' | 'pages' | 'history'>('llms');
+  const [sourceLlms, setSourceLlms] = useState<string | null>(null);
+  const [sourceLlmsErr, setSourceLlmsErr] = useState<string | null>(null);
 
   const load = async () => {
     const [r, history] = await Promise.all([api.getSource(id), api.getSourceHistory(id)]);
@@ -29,8 +32,20 @@ export function SourceView({
   useEffect(() => {
     setSelected(null);
     setContent(null);
+    setSourceLlms(null);
+    setSourceLlmsErr(null);
     load();
   }, [id]);
+
+  useEffect(() => {
+    if (tab !== 'llms') return;
+    setSourceLlms(null);
+    setSourceLlmsErr(null);
+    api
+      .getSourceLlms(id)
+      .then(setSourceLlms)
+      .catch((e) => setSourceLlmsErr(String(e)));
+  }, [id, tab]);
 
   useEffect(() => {
     if (!selected || !selected.cache_hash) { setContent(null); return; }
@@ -51,6 +66,8 @@ export function SourceView({
 
   if (!source) return <div className="meta">Loading…</div>;
 
+  const sourceLlmsUrl = `/agent/sources/${source.id}/llms.txt`;
+
   const refresh = async () => {
     await api.refreshSource(id);
     await load();
@@ -58,7 +75,7 @@ export function SourceView({
 
   const setState = async (state: Source['state']) => {
     if (state === 'active' && source.state !== 'active') {
-      const promotion_reason = prompt('Promotion reason for trusting this source:');
+      const promotion_reason = prompt('Promotion reason for trusting this imported doc set:');
       if (promotion_reason === null) return;
       await api.patchSource(id, {
         state,
@@ -90,6 +107,9 @@ export function SourceView({
       <div className="toolbar">
         <h1>{source.title || source.url}</h1>
         <span className={`tag`}>{source.state}</span>
+        <a href={sourceLlmsUrl} target="_blank" rel="noreferrer">
+          <button disabled={source.state !== 'active'}>Raw</button>
+        </a>
         {source.state !== 'active' && <button onClick={() => setState('active')}>Promote → active</button>}
         {source.state !== 'archived' && <button onClick={() => setState('archived')}>Archive</button>}
         {source.state === 'archived' && <button onClick={() => setState('trial')}>Restore → trial</button>}
@@ -100,6 +120,23 @@ export function SourceView({
       <div className="kv" style={{ marginBottom: 12 }}>
         <span className="k">URL</span>
         <span><a href={source.url} target="_blank" rel="noreferrer">{source.url}</a></span>
+        <span className="k">Endpoint</span>
+        <span>
+          <span className="endpoint-row">
+            <code>{sourceLlmsUrl}</code>
+            <a href={sourceLlmsUrl} target="_blank" rel="noreferrer">
+              <button disabled={source.state !== 'active'}>Open</button>
+            </a>
+            <button
+              onClick={() => navigator.clipboard.writeText(sourceLlmsUrl)}
+            >
+              Copy
+            </button>
+          </span>
+          {source.state !== 'active' && (
+            <span className="meta">Promote this imported doc set to active before agents can fetch this endpoint.</span>
+          )}
+        </span>
         <span className="k">Last fetched</span>
         <span>{source.last_fetched ? new Date(source.last_fetched).toLocaleString() : 'never'}</span>
         <span className="k">TTL (hours)</span>
@@ -152,7 +189,7 @@ export function SourceView({
         <span>
           <textarea
             defaultValue={source.intended_use ?? ''}
-            placeholder="When agents should use this source"
+            placeholder="When agents should use this imported doc set"
             onBlur={(e) => patchSource({ intended_use: e.target.value })}
             style={{ width: '100%', minHeight: 44 }}
           />
@@ -161,7 +198,7 @@ export function SourceView({
         <span>
           <textarea
             defaultValue={source.trust_note ?? ''}
-            placeholder="Why this source is trusted"
+            placeholder="Why this imported doc set is trusted"
             onBlur={(e) => patchSource({ trust_note: e.target.value })}
             style={{ width: '100%', minHeight: 44 }}
           />
@@ -190,7 +227,7 @@ export function SourceView({
         <span>
           <textarea
             defaultValue={source.promotion_reason ?? ''}
-            placeholder="Why this source was promoted to active"
+            placeholder="Why this imported doc set was promoted to active"
             onBlur={(e) => patchSource({ promotion_reason: e.target.value })}
             style={{ width: '100%', minHeight: 44 }}
           />
@@ -203,61 +240,91 @@ export function SourceView({
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) minmax(0, 1fr)', gap: 16, minHeight: 420 }}>
-        <div style={{ overflowY: 'auto', border: '1px solid #1f2430', borderRadius: 6, maxHeight: '70vh' }}>
-          {links.length === 0 && <div className="meta" style={{ padding: 12 }}>No links yet — refresh the source.</div>}
-          {groupLinks(links).map(([section, ll]) => (
-            <div key={section}>
-              <div style={{ padding: '6px 12px', background: '#1a1f29', fontSize: 11, textTransform: 'uppercase', color: '#7c8493', letterSpacing: 1 }}>
-                {section || '(no section)'}
-              </div>
-              {ll.map((l) => (
-                <div
-                  key={l.id}
-                  className="link-row"
-                  style={{ background: selected?.id === l.id ? '#25304a' : undefined }}
-                  onClick={() => setSelected(l)}
-                >
-                  <div className="t">{l.title || l.url}</div>
-                  <div className="u">{l.url}</div>
-                  {l.description && <div className="d">{l.description}</div>}
-                  {l.last_error && <div className="error" style={{ fontSize: 11 }}>{l.last_error}</div>}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="preview" style={{ overflowY: 'auto', maxHeight: '70vh' }}>
-          {!selected && <div className="meta">Select a link to preview its normalized markdown.</div>}
-          {selected && !selected.cache_hash && (
-            <div>
-              <div className="meta">Not cached yet.</div>
-              <button onClick={async () => { await api.refreshLink(selected.id); await load(); }}>Fetch now</button>
-            </div>
-          )}
-          {selected && contentErr && <div className="error">{contentErr}</div>}
-          {selected && content && (
-            <>
-              <div className="meta" style={{ marginBottom: 8 }}>
-                <a href={selected.url} target="_blank" rel="noreferrer">Open original</a>
-                {' · '}
-                <button style={{ padding: '2px 6px', fontSize: 11 }} onClick={async () => { await api.refreshLink(selected.id); await load(); const c = await api.linkContent(selected.id); setContent(c); }}>
-                  Refresh
-                </button>
-              </div>
-              <Markdown>{content}</Markdown>
-            </>
-          )}
-        </div>
+      <div className="segmented" style={{ marginBottom: 12 }}>
+        <button className={tab === 'llms' ? 'active' : ''} onClick={() => setTab('llms')}>
+          llms.txt
+        </button>
+        <button className={tab === 'pages' ? 'active' : ''} onClick={() => setTab('pages')}>
+          Pages <span className="button-count">{links.length}</span>
+        </button>
+        <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>
+          History
+        </button>
       </div>
 
-      <div style={{ marginTop: 20 }}>
+      {tab === 'llms' && (
+        <div className="editor source-llms-editor">
+          <textarea value={sourceLlms ?? ''} readOnly spellCheck={false} placeholder="Loading imported llms.txt..." />
+          <div className="preview">
+            {sourceLlmsErr && (
+              <div className="error">
+                {sourceLlmsErr}
+              </div>
+            )}
+            {!sourceLlms && !sourceLlmsErr && <div className="meta">Loading imported llms.txt...</div>}
+            {sourceLlms && <Markdown>{sourceLlms}</Markdown>}
+          </div>
+        </div>
+      )}
+
+      {tab === 'pages' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) minmax(0, 1fr)', gap: 16, minHeight: 420 }}>
+          <div style={{ overflowY: 'auto', border: '1px solid #1f2430', borderRadius: 6, maxHeight: '70vh' }}>
+            {links.length === 0 && <div className="meta" style={{ padding: 12 }}>No links yet — refresh the imported doc set.</div>}
+            {groupLinks(links).map(([section, ll]) => (
+              <div key={section}>
+                <div style={{ padding: '6px 12px', background: '#1a1f29', fontSize: 11, textTransform: 'uppercase', color: '#7c8493', letterSpacing: 1 }}>
+                  {section || '(no section)'}
+                </div>
+                {ll.map((l) => (
+                  <div
+                    key={l.id}
+                    className="link-row"
+                    style={{ background: selected?.id === l.id ? '#25304a' : undefined }}
+                    onClick={() => setSelected(l)}
+                  >
+                    <div className="t">{l.title || l.url}</div>
+                    <div className="u">{l.url}</div>
+                    {l.description && <div className="d">{l.description}</div>}
+                    {l.last_error && <div className="error" style={{ fontSize: 11 }}>{l.last_error}</div>}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="preview" style={{ overflowY: 'auto', maxHeight: '70vh' }}>
+            {!selected && <div className="meta">Select a link to preview its normalized markdown.</div>}
+            {selected && !selected.cache_hash && (
+              <div>
+                <div className="meta">Not cached yet.</div>
+                <button onClick={async () => { await api.refreshLink(selected.id); await load(); }}>Fetch now</button>
+              </div>
+            )}
+            {selected && contentErr && <div className="error">{contentErr}</div>}
+            {selected && content && (
+              <>
+                <div className="meta" style={{ marginBottom: 8 }}>
+                  <a href={selected.url} target="_blank" rel="noreferrer">Open original</a>
+                  {' · '}
+                  <button style={{ padding: '2px 6px', fontSize: 11 }} onClick={async () => { await api.refreshLink(selected.id); await load(); const c = await api.linkContent(selected.id); setContent(c); }}>
+                    Refresh
+                  </button>
+                </div>
+                <Markdown>{content}</Markdown>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'history' && (
+      <div>
         <h2 className="section-title">Refresh history</h2>
         <div className="history-grid">
           <div className="history-panel">
-            <div className="history-heading">Source refreshes</div>
+            <div className="history-heading">Imported doc refreshes</div>
             {sourceHistory.length === 0 ? (
-              <div className="meta" style={{ padding: '8px 0' }}>No source refresh history yet.</div>
+              <div className="meta" style={{ padding: '8px 0' }}>No imported doc refresh history yet.</div>
             ) : (
               sourceHistory.map((item) => (
                 <HistoryRow
@@ -290,6 +357,7 @@ export function SourceView({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

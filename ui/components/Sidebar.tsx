@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { api, type Source } from '../api';
+import { api, type LocalDocType, type Source } from '../api';
 import type { Namespace, Selection } from '../App';
 
 interface Props {
   sources: Source[];
-  entries: string[];
   namespaces: Namespace[];
   selection: Selection;
   onSelect: (s: Selection) => void;
@@ -14,7 +13,6 @@ interface Props {
 
 export function Sidebar({
   sources,
-  entries,
   namespaces,
   selection,
   onSelect,
@@ -23,22 +21,6 @@ export function Sidebar({
 }: Props) {
   const [filter, setFilter] = useState<'all' | 'trial' | 'active' | 'archived'>('all');
   const filtered = sources.filter((s) => filter === 'all' || s.state === filter);
-
-  // Group entries by namespace prefix.
-  const nsNames = new Set(namespaces.map((n) => n.name));
-  const grouped = new Map<string, string[]>();
-  const loose: string[] = [];
-  for (const e of entries) {
-    const top = e.split('/')[0];
-    if (nsNames.has(top) && e.split('/').length > 1) {
-      const list = grouped.get(top) ?? [];
-      list.push(e);
-      grouped.set(top, list);
-    } else if (!nsNames.has(top)) {
-      loose.push(e);
-    }
-    // entries that ARE the namespace's llms.txt aren't here (entries are *.md only)
-  }
 
   return (
     <div className="sidebar">
@@ -65,41 +47,23 @@ export function Sidebar({
       </div>
 
       <h2 style={{ display: 'flex', alignItems: 'center' }}>
-        <span>Namespaces</span>
+        <span>Local Docs</span>
         <NewNamespaceButton onCreated={async (name) => { await onReload(); onSelect({ kind: 'namespace-llms', namespace: name }); }} />
       </h2>
       {namespaces.length === 0 && (
-        <div className="meta" style={{ padding: '4px 8px' }}>No namespaces yet</div>
+        <div className="meta" style={{ padding: '4px 8px' }}>No local docs yet</div>
       )}
       {namespaces.map((ns) => (
-        <NamespaceGroup
+        <NamespaceRow
           key={ns.name}
           ns={ns}
-          entries={grouped.get(ns.name) ?? []}
           selection={selection}
           onSelect={onSelect}
-          onReload={onReload}
         />
       ))}
 
-      {loose.length > 0 && (
-        <>
-          <h2>Loose entries</h2>
-          {loose.map((name) => (
-            <div
-              key={name}
-              className={`item ${selection.kind === 'own-entry' && selection.name === name ? 'active' : ''}`}
-              onClick={() => onSelect({ kind: 'own-entry', name })}
-            >
-              {name}
-            </div>
-          ))}
-        </>
-      )}
-      <NewEntryButton onCreated={async (n) => { await onReload(); onSelect({ kind: 'own-entry', name: n }); }} />
-
       <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span>Sources</span>
+        <span>Imported Docs</span>
         <button style={{ padding: '2px 8px', fontSize: 11, marginLeft: 'auto' }} onClick={onAddSource}>+ Add</button>
       </h2>
       <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
@@ -113,62 +77,77 @@ export function Sidebar({
           </button>
         ))}
       </div>
-      {filtered.length === 0 && <div className="meta" style={{ padding: '4px 8px' }}>No sources</div>}
+      {filtered.length === 0 && <div className="meta" style={{ padding: '4px 8px' }}>No imported docs</div>}
       {filtered.map((s) => (
-        <div
+        <SourceRow
           key={s.id}
-          className={`item ${selection.kind === 'source' && selection.id === s.id ? 'active' : ''}`}
-          onClick={() => onSelect({ kind: 'source', id: s.id })}
-          title={s.url}
-        >
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {s.title || s.url}
-          </span>
-          {typeof s.linkCount === 'number' && (
-            <span className="badge" style={{ marginLeft: 'auto' }} title="links">
-              {s.linkCount}
-            </span>
-          )}
-          <span className={`badge ${s.state}`} style={typeof s.linkCount === 'number' ? undefined : { marginLeft: 'auto' }}>{s.state}</span>
-        </div>
+          source={s}
+          selection={selection}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );
 }
 
-function NamespaceGroup({
-  ns,
-  entries,
+function SourceRow({
+  source,
   selection,
   onSelect,
-  onReload,
 }: {
-  ns: Namespace;
-  entries: string[];
+  source: Source;
   selection: Selection;
   onSelect: (s: Selection) => void;
-  onReload: () => void;
 }) {
-  const [open, setOpen] = useState(true);
-
-  const del = async () => {
-    if (!confirm(`Delete namespace "${ns.name}" and ALL its files?`)) return;
-    await api.deleteNamespace(ns.name);
-    await onReload();
-    onSelect({ kind: 'own-llms' });
-  };
+  const endpoint = `/agent/sources/${source.id}/llms.txt`;
 
   return (
-    <div style={{ marginBottom: 6 }}>
-      <div className="item" style={{ fontWeight: 600, color: '#9aa3b2' }}>
-        <span style={{ cursor: 'pointer' }} onClick={() => setOpen(!open)}>
-          {open ? '▾' : '▸'} {ns.name}/
+    <div
+      className={`item source-nav-row ${selection.kind === 'source' && selection.id === source.id ? 'active' : ''}`}
+      onClick={() => onSelect({ kind: 'source', id: source.id })}
+      title={`${source.url}\n${endpoint}`}
+    >
+      <span className="source-nav-title">
+        {source.title || source.url}
+        <span className="source-nav-endpoint">{endpoint}</span>
+      </span>
+      {typeof source.linkCount === 'number' && (
+        <span className="badge" title="links">
+          {source.linkCount}
+        </span>
+      )}
+      <span className={`badge ${source.state}`}>{source.state}</span>
+    </div>
+  );
+}
+
+function NamespaceRow({
+  ns,
+  selection,
+  onSelect,
+}: {
+  ns: Namespace;
+  selection: Selection;
+  onSelect: (s: Selection) => void;
+}) {
+  return (
+    <div
+      className={`item namespace-nav-row ${selection.kind === 'namespace-llms' && selection.namespace === ns.name ? 'active' : ''}`}
+      onClick={() => onSelect({ kind: 'namespace-llms', namespace: ns.name })}
+      title={ns.summary ?? ns.title}
+    >
+        <span className="namespace-nav-title">
+          {ns.title || ns.name}
+          <span className="namespace-nav-name">{ns.name}/</span>
         </span>
         {typeof ns.entryCount === 'number' && (
-          <span className="badge" style={{ marginLeft: 'auto' }} title="links in llms.txt">
+          <span className="badge" title="links in llms.txt">
             {ns.entryCount}
           </span>
         )}
+        <span className="badge" title="Local Docs profile">
+          {ns.doc_type}
+        </span>
         {ns.health && ns.health.status !== 'healthy' && (
           <span
             className={`badge health-dot ${ns.health.status}`}
@@ -177,89 +156,6 @@ function NamespaceGroup({
             {ns.health.status === 'error' ? '!' : '?'}
           </span>
         )}
-        <span
-          className="badge"
-          style={{ marginLeft: typeof ns.entryCount === 'number' ? undefined : 'auto', cursor: 'pointer' }}
-          onClick={del}
-          title="Delete namespace"
-        >
-          ×
-        </span>
-      </div>
-      {open && (
-        <>
-          <div
-            className={`item ${selection.kind === 'namespace-llms' && selection.namespace === ns.name ? 'active' : ''}`}
-            style={{ paddingLeft: 24 }}
-            onClick={() => onSelect({ kind: 'namespace-llms', namespace: ns.name })}
-          >
-            llms.txt
-          </div>
-          {entries.map((e) => (
-            <div
-              key={e}
-              className={`item ${selection.kind === 'own-entry' && selection.name === e ? 'active' : ''}`}
-              style={{ paddingLeft: 24 }}
-              onClick={() => onSelect({ kind: 'own-entry', name: e })}
-            >
-              {e.slice(ns.name.length + 1)}
-            </div>
-          ))}
-          <NewEntryButton
-            label="+ entry"
-            prefix={`${ns.name}/`}
-            onCreated={async (n) => { await onReload(); onSelect({ kind: 'own-entry', name: n }); }}
-          />
-        </>
-      )}
-    </div>
-  );
-}
-
-function NewEntryButton({
-  onCreated,
-  prefix = '',
-  label = '+ New entry',
-}: {
-  onCreated: (name: string) => void;
-  prefix?: string;
-  label?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  if (!open) {
-    return (
-      <div
-        className="item"
-        onClick={() => setOpen(true)}
-        style={{ color: '#7c8493', paddingLeft: prefix ? 24 : undefined }}
-      >
-        {label}
-      </div>
-    );
-  }
-  return (
-    <div style={{ padding: '4px 8px', paddingLeft: prefix ? 24 : 8, display: 'flex', gap: 4 }}>
-      <input
-        autoFocus
-        placeholder={prefix ? 'overview.md' : 'apis/my-api.md'}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={async (e) => {
-          if (e.key === 'Enter' && name.trim()) {
-            const base = name.trim().endsWith('.md') ? name.trim() : `${name.trim()}.md`;
-            const finalName = `${prefix}${base}`;
-            await api.putEntry(finalName, `# ${base.replace(/\.md$/, '')}\n\n`);
-            setOpen(false);
-            setName('');
-            onCreated(finalName);
-          } else if (e.key === 'Escape') {
-            setOpen(false);
-            setName('');
-          }
-        }}
-        style={{ flex: 1 }}
-      />
     </div>
   );
 }
@@ -267,6 +163,21 @@ function NewEntryButton({
 function NewNamespaceButton({ onCreated }: { onCreated: (name: string) => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  const [docType, setDocType] = useState<LocalDocType>('api');
+  const create = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      await api.createNamespace({ name: trimmed, doc_type: docType });
+      setOpen(false);
+      onCreated(trimmed);
+      setName('');
+      setDocType('api');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   return (
     <span style={{ marginLeft: 'auto' }}>
       {!open && (
@@ -275,29 +186,37 @@ function NewNamespaceButton({ onCreated }: { onCreated: (name: string) => void }
         </button>
       )}
       {open && (
-        <input
-          autoFocus
-          placeholder="auth-system"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => { setOpen(false); setName(''); }}
-          onKeyDown={async (e) => {
-            if (e.key === 'Enter' && name.trim()) {
-              try {
-                await api.createNamespace({ name: name.trim() });
+        <span style={{ display: 'grid', gap: 4, marginLeft: 8, width: 150 }}>
+          <input
+            autoFocus
+            placeholder="orders-api"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={async (e) => {
+              if (e.key === 'Enter') await create();
+              if (e.key === 'Escape') {
                 setOpen(false);
-                onCreated(name.trim());
                 setName('');
-              } catch (err) {
-                alert(err instanceof Error ? err.message : String(err));
               }
-            } else if (e.key === 'Escape') {
-              setOpen(false);
-              setName('');
-            }
-          }}
-          style={{ width: 110, fontSize: 11, padding: '2px 6px' }}
-        />
+            }}
+            style={{ width: '100%', fontSize: 11, padding: '2px 6px' }}
+          />
+          <span style={{ display: 'flex', gap: 4 }}>
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value as LocalDocType)}
+              style={{ minWidth: 0, flex: 1, fontSize: 11, padding: '2px 4px' }}
+            >
+              <option value="api">API</option>
+              <option value="website">Website</option>
+              <option value="library">Library</option>
+              <option value="notes">Notes</option>
+            </select>
+            <button style={{ padding: '2px 6px', fontSize: 11 }} onClick={create} disabled={!name.trim()}>
+              Create
+            </button>
+          </span>
+        </span>
       )}
     </span>
   );

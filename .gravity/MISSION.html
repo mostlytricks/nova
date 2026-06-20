@@ -2,7 +2,7 @@
 <!--
   MISSION.html — the durable "why" for local-llmstxt-server (one of the four clocks; see workspace CLAUDE.md §6).
   Slowest-changing doc: purpose + principles + non-goals that should survive refactors.
-  In-flight state → CONTEXT.md. Phase roadmap → IMPLEMENTATION_PLAN.md. Theme = workspace DOC_THEME.md.
+  In-flight state → ../CONTEXT.md. Phase roadmap → ./IMPLEMENTATION_PLAN.md. Theme = workspace DOC_THEME.md.
   Converted from the original MISSION.md draft (2026-06-04).
 -->
 <html lang="en">
@@ -181,12 +181,13 @@
     <h1>Project mission</h1>
     <!-- lede = the ONE sentence that re-orients you. The dashboard reads it verbatim. -->
     <p class="lede">An intranet documentation control plane that curates the small, trusted set of docs coding agents should read first — and serves it as focused, namespaced <code>llms.txt</code> manifests.</p>
-    <p style="color:var(--faint);font-size:13px;margin-top:4px">Read before <code>IMPLEMENTATION_PLAN.md</code> (the roadmap), then hand work to the agent through <code>CLAUDE.md</code> and the rolling <code>CONTEXT.md</code>.</p>
+    <p style="color:var(--faint);font-size:13px;margin-top:4px">Read before <code>.gravity/IMPLEMENTATION_PLAN.md</code> (the roadmap), then hand work to the agent through the root <code>CLAUDE.md</code> and the rolling <code>CONTEXT.md</code>.</p>
     <div class="toc"><ol>
       <li><a href="#mission">Mission</a></li>
       <li><a href="#staging">Why this first</a></li>
       <li><a href="#principles">Product principles</a></li>
       <li><a href="#architecture">Architecture principle</a></li>
+      <li><a href="#domains">The two domains</a></li>
       <li><a href="#pipeline">Planning pipeline</a></li>
       <li><a href="#non-goals">Current non-goals</a></li>
     </ol></div>
@@ -237,20 +238,33 @@
   provenance <span class="c">(url · ts · refresh status)</span> travels with every imported/cached doc
   a split emits <b>sibling</b> namespaces — the original namespace is left untouched</pre>
 
-  <h2 id="pipeline"><span class="n">05</span>Planning Pipeline</h2>
+  <h2 id="domains"><span class="n">05</span>The Two Domains</h2>
+  <!-- Per-domain WHY. The directory .gravity/<domain>/ is the registry; this table is the singular
+       "why" owner — one row per domain. Keep the why here, never in per-folder WHY files. -->
+  <p>The work splits into two durable domains, each owning one stretch of the §04 seam. Each has a folder under <code>.gravity/</code> carrying its agent contract (<code>SPEC.md</code>) and, when it earns one, a deep-dive. <strong>One north star, two domains</strong> — the <em>why</em> stays here; the mechanics live in each <code>SPEC.md</code>, with <code>ARCHITECTURE.html</code> as the human reference.</p>
+  <table>
+    <thead><tr><th>Domain</th><th>Why it exists · the principle that wins arguments</th><th>Non-goal (the guard)</th></tr></thead>
+    <tbody>
+      <tr><td><code>ingest</code></td><td>Turn <em>any</em> input — URL, deck, PDF, paste, CSR/SPA — into a namespace without mutating the source; the front door picks a lane, the output contract never changes. <strong>Probe before you fetch; prefer the cheapest lossless rung.</strong></td><td>Not a mass crawler — a URL is never auto-routed past the probe; CSR pages fall through a deliberate ladder, not a scrape.</td></tr>
+      <tr><td><code>namespace</code></td><td>Define what a <em>good</em> dev/API <code>llms.txt</code> namespace is, so an agent picks the right entry from the manifest alone. <strong>Don't invent — ask; one auth home; a description on every link.</strong></td><td>Not a copywriter — composing never normalizes voice, translates, or adds AI-summary preambles.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="pipeline"><span class="n">06</span>Planning Pipeline</h2>
   <p>The project docs change at different rates — keep each one narrow so the agent can resume without re-deriving the mission every time. <strong>One concern, one home:</strong> each doc owns its column; if another doc needs a fact, it links here rather than restating it.</p>
   <table>
     <thead><tr><th>Document</th><th>Job (what it owns)</th><th>Changes</th></tr></thead>
     <tbody>
-      <tr><td><code>MISSION.html</code></td><td>Why: north star, principles, non-goals that survive refactors.</td><td>rarely</td></tr>
-      <tr><td><code>CLAUDE.md</code></td><td>How: repo identity, stack, constraints, entry points, how the agent should behave here.</td><td>on refactors</td></tr>
-      <tr><td><code>IMPLEMENTATION_PLAN.md</code></td><td>What/next: phase roadmap, locked decisions, the verification gate, open questions.</td><td>per phase</td></tr>
-      <tr><td><code>CONTEXT.md</code></td><td>Now: current state, last 1-2 sessions, the immediate next step.</td><td>per session</td></tr>
-      <tr><td><code>ARCHITECTURE.html</code> <span style="color:var(--faint)">(optional)</span></td><td>How it's built: component boundaries, the seam's mechanics, data contracts. Add only when "how it's built" outgrows CLAUDE.md's entry points.</td><td>on structural change</td></tr>
+      <tr><td><code>.gravity/MISSION.html</code></td><td>Why: north star, principles, the two domains (§05), non-goals that survive refactors.</td><td>rarely</td></tr>
+      <tr><td><code>CLAUDE.md</code> <span style="color:var(--faint)">(root)</span></td><td>How: repo identity, stack, constraints, entry points, the Doc Map + read-first router.</td><td>on refactors</td></tr>
+      <tr><td><code>.gravity/IMPLEMENTATION_PLAN.md</code></td><td>What/next: phase roadmap, locked decisions, the verification gate, the per-domain status spine.</td><td>per phase</td></tr>
+      <tr><td><code>CONTEXT.md</code> <span style="color:var(--faint)">(root)</span></td><td>Now: current state, last 1-2 sessions, the immediate next step.</td><td>per session</td></tr>
+      <tr><td><code>.gravity/&lt;domain&gt;/SPEC.md</code></td><td>Rules: the compact agent contract for one domain (<code>ingest</code> / <code>namespace</code>) — what an agent must not break.</td><td>as a domain's rules change</td></tr>
+      <tr><td><code>.gravity/ARCHITECTURE.html</code> <span style="color:var(--faint)">(optional)</span></td><td>How it's built: component boundaries, the seam's mechanics, ingestion paths, data contracts.</td><td>on structural change</td></tr>
     </tbody>
   </table>
 
-  <h2 id="non-goals"><span class="n">06</span>Current Non-Goals</h2>
+  <h2 id="non-goals"><span class="n">07</span>Current Non-Goals</h2>
   <ul>
     <li><strong>Not a general bookmark manager.</strong> Scope is docs an agent should trust during software work, not arbitrary link-saving for humans.</li>
     <li><strong>Not a public documentation crawler.</strong> External sources are human-probed and human-promoted, never mass-scraped — trust is a deliberate act.</li>

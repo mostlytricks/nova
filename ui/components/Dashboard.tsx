@@ -31,15 +31,15 @@ export function Dashboard({ namespaces, sources, onSelect, onReload }: Props) {
 
       {stats && (
         <div className="stat-strip">
-          <Stat label="Namespaces" value={stats.namespaces.count} />
+          <Stat label="Local docs" value={stats.namespaces.count} />
           <Stat
-            label="Namespace health"
+            label="Local health"
             value={healthSummary(namespaces)}
             tone={namespaces.some((ns) => ns.health?.status === 'error') ? 'warn' : undefined}
           />
           <Stat label="Own entries" value={stats.ownEntries.count} />
           <Stat
-            label="Sources"
+            label="Imported docs"
             value={stats.sources.total}
             sub={`${stats.sources.active} active · ${stats.sources.trial} trial · ${stats.sources.archived} archived`}
           />
@@ -56,9 +56,9 @@ export function Dashboard({ namespaces, sources, onSelect, onReload }: Props) {
         </div>
       )}
 
-      <h2 className="section-title">My namespaces</h2>
+      <h2 className="section-title">Local Docs</h2>
       {namespaces.length === 0 && (
-        <div className="meta">No namespaces yet. Create one from the sidebar.</div>
+        <div className="meta">No local docs yet. Create one from the sidebar.</div>
       )}
       <div className="card-grid">
         {namespaces.map((ns) => {
@@ -76,9 +76,9 @@ export function Dashboard({ namespaces, sources, onSelect, onReload }: Props) {
         })}
       </div>
 
-      <h2 className="section-title">External sources</h2>
+      <h2 className="section-title">Imported Docs</h2>
       {sources.length === 0 && (
-        <div className="meta">No external sources tracked. Use "+ Add" in the sidebar.</div>
+        <div className="meta">No imported docs tracked. Use "+ Add" in the sidebar.</div>
       )}
       <div className="card-list">
         {sources.map((s) => (
@@ -168,7 +168,7 @@ function NamespaceCard({
       {ns.summary && <div className="card-summary">{ns.summary}</div>}
       <NoteEditor
         value={ns.note ?? ''}
-        placeholder="Add an operator note for this namespace (appears in master llms.txt)…"
+        placeholder="Add an operator note for this local doc set (appears in master llms.txt)…"
         save={async (v) => {
           await api.putNamespaceNote(ns.name, v);
           onNoteSaved();
@@ -229,7 +229,7 @@ function SourceCard({
       {source.summary && <div className="card-summary">{source.summary}</div>}
       <NoteEditor
         value={source.notes ?? ''}
-        placeholder="Add an operator note for this source…"
+        placeholder="Add an operator note for this imported doc set…"
         save={async (v) => {
           await api.patchSource(source.id, { notes: v } as any);
           onNoteSaved();

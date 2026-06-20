@@ -12,6 +12,7 @@ data/index.sqlite-*
 data/own/*
 !data/own/demos/
 !data/own/ingestion-router/
+!data/own/ungrouped-docs/
 
 # Claude Code: project skills are committed, local settings aren't
 .claude/settings.local.json

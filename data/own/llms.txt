@@ -5,10 +5,8 @@
 This is the canonical entry point. Agents reading from this server should
 prefer entries here before consulting external sources.
 
-## Libraries
+## Local Docs
 
-- [Example Lib](/api/entries/get?name=libs/example.md): A placeholder for your own library docs
-
-## APIs
-
-- [Example API](/api/entries/get?name=apis/example.md): A placeholder for your own API docs
+- [Ungrouped docs](/ungrouped-docs/llms.txt): Root-level docs that have not been split into a dedicated namespace yet
+- [Demo Orders API](/demos/llms.txt): Golden Local Docs example for a specific internal API
+- [Ingestion Router](/ingestion-router/llms.txt): Project-local ingestion router specs and validation contract

@@ -3,6 +3,15 @@
 > Scope: this file is the shared execution plan for agents working on `local-llmstxt-server`.
 > Read `MISSION.html` first. The mission is durable; this plan is the phase roadmap.
 
+## Per-domain status (`.gravity/<domain>/`)
+
+The phase roadmap below tracks the *control-plane build*; this table tracks the two doc **domains** (MISSION.html §05). Legend: ✓ shipped/stable · ◑ active · ○ planned.
+
+| Domain | | Where it stands · next |
+|---|---|---|
+| `ingest` | ◑ | Front-door router + CSR/SPA ladder (Track R) complete locally, **pending commit**. Contract: `ingest/SPEC.md`. Next: commit Track R; fold login/CA fourth-path note into the ladder. |
+| `namespace` | ✓ | Output contract stable and enforced by `pnpm docs-import check`. Contract: `namespace/SPEC.md`. Next: revisit only as dev/API requirements evolve. |
+
 ## Mission Fit
 
 `local-llmstxt-server` should become an intranet documentation control plane for coding agents: one trusted local place where humans curate local docs, internal API notes, and approved external `llms.txt` sources, then expose them as focused, namespaced manifests that agents can fetch selectively.
@@ -548,7 +557,7 @@ Consider SQLite FTS if simple search is too slow. Do not add heavy search infras
 
 ## Track R — Ingestion Router & CSR/SPA Handling
 
-> A parallel track (not one of the numbered phases) that runs **ahead of Phase 8**. It hardens the *input side* of the control plane: turning any input — URL, swagger, pptx, PDF, pasted text, or a horrible client-side-rendered SPA — into a namespace that satisfies `SPEC.dev-docs-llms-txt.md`. Read `SPEC.ingest-router.md` and `SPEC.dev-docs-llms-txt.md` before touching this.
+> A parallel track (not one of the numbered phases) that runs **ahead of Phase 8**. It hardens the *input side* of the control plane: turning any input — URL, swagger, pptx, PDF, pasted text, or a horrible client-side-rendered SPA — into a namespace that satisfies `namespace/SPEC.md`. Read `ingest/SPEC.md` and `namespace/SPEC.md` before touching this.
 
 ### Why
 
@@ -556,13 +565,13 @@ Inputs grew beyond clean URLs. Two failure modes had to be closed: (1) arbitrary
 
 ### Locked decisions
 
-- [x] **Two ingestion lanes, one output contract.** `docs-import` (URL → CLI fetch/parse) and `llms-compose` (local material → agent reads it). Both must satisfy `SPEC.dev-docs-llms-txt.md`. Front door = `SPEC.ingest-router.md`.
+- [x] **Two ingestion lanes, one output contract.** `docs-import` (URL → CLI fetch/parse) and `llms-compose` (local material → agent reads it). Both must satisfy `namespace/SPEC.md`. Front door = `ingest/SPEC.md`.
 - [x] **CSR/SPA = a 3-rung ladder, graceful degradation** (chosen over CLI-only render or paste-only): `mdTwin` shortcut → headless render → operator reader-mode paste. Prefer the cheapest lossless rung.
 - [x] **`llms-compose` produces no new output shape** — same `data/own/<ns>/` namespace; only the reader differs. It centers on a metadata interview that fills the gaps raw material leaves (base URL, auth, summary, provenance) — **asks, never invents**.
 
 ### Increment 1 — Router + CSR detection + md-twin shortcut — **DONE 2026-06-20** (uncommitted)
 
-Shipped: `probe` (in `server/bin/docs-import.ts`) returns `rendering: 'ssr' | 'csr'` and `mdTwin: string | null`. `detectCsr()` flags client-side rendering from an empty mount container or low rendered-text + multiple scripts (framework markers only corroborate, so SSG-with-content is not a false positive). `findMdTwin()` discovers `/page.md` shortcuts. Authored `SPEC.dev-docs-llms-txt.md` (output contract + quality gate), `SPEC.ingest-router.md` (front door + ladder), and the `llms-compose` skill (DRAFT); wired the `docs-import` skill to check `rendering` first.
+Shipped: `probe` (in `server/bin/docs-import.ts`) returns `rendering: 'ssr' | 'csr'` and `mdTwin: string | null`. `detectCsr()` flags client-side rendering from an empty mount container or low rendered-text + multiple scripts (framework markers only corroborate, so SSG-with-content is not a false positive). `findMdTwin()` discovers `/page.md` shortcuts. Authored `namespace/SPEC.md` (output contract + quality gate), `ingest/SPEC.md` (front door + ladder), and the `llms-compose` skill (DRAFT); wired the `docs-import` skill to check `rendering` first.
 
 Verified: `pnpm typecheck` clean; live `fastify.dev` stays `ssr`; a local SPA-shell server reports `csr`, finds the twin when present and emits the paste-fallback warning when absent.
 
@@ -584,8 +593,8 @@ Dry-run completed with the local Track R spec files as real local material. `llm
 |---|---|
 | `server/bin/docs-import.ts` | `probe` CSR/twin fields (done); `fetch-clean --render` (done). |
 | `server/fetcher/fetch.ts` | Expose `htmlToMarkdown(html, url)` for the render path (done). |
-| `SPEC.ingest-router.md` | Front door + ladder (done). Canonical for routing. |
-| `SPEC.dev-docs-llms-txt.md` | Output contract + quality gate (done). Canonical for "what good looks like". |
+| `ingest/SPEC.md` | Front door + ladder (done). Canonical for routing. |
+| `namespace/SPEC.md` | Output contract + quality gate (done). Canonical for "what good looks like". |
 | `.claude/skills/{docs-import,llms-compose}/SKILL.md` | Procedures; both link the router (done; drop `llms-compose` DRAFT in Inc 3). |
 
 ---

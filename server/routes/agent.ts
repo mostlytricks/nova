@@ -12,6 +12,22 @@ interface AgentIndexLink {
   absoluteUrl: string;
 }
 
+interface AgentExternalSourceLink {
+  id: number;
+  title: string;
+  url: string;
+  llmsUrl: string;
+  absoluteLlmsUrl: string;
+  owner: string | null;
+  trustNote: string | null;
+  intendedUse: string | null;
+  warning: string | null;
+  lastReviewedAt: number | null;
+  promotionReason: string | null;
+  lastFetched: number | null;
+  lastError: string | null;
+}
+
 interface AgentNamespaceLink extends AgentIndexLink {
   name: string;
   title: string;
@@ -53,39 +69,63 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
       .all('active') as SourceRow[];
 
     const masterUrl = '/llms.txt';
-    const mergedUrl = '/llms.txt?merge=true';
+    const agentUrl = '/agent/llms.txt';
+    const namespacesUrl = '/agent/namespaces';
+    const sourcesUrl = '/agent/sources';
     const startHere = healthyNamespaces[0] ?? namespaces.find((namespace) => !namespace.isSplit) ?? namespaces[0] ?? null;
 
     return {
       generatedAt: Date.now(),
+      recommended: {
+        label: 'Recommended agent manifest',
+        url: agentUrl,
+        absoluteUrl: absoluteUrl(origin, agentUrl),
+      } satisfies AgentIndexLink,
       master: {
-        label: 'Master llms.txt',
+        label: 'Local master llms.txt',
         url: masterUrl,
         absoluteUrl: absoluteUrl(origin, masterUrl),
       } satisfies AgentIndexLink,
       mergedExternal: {
-        label: 'Master + active external sources',
-        url: mergedUrl,
-        absoluteUrl: absoluteUrl(origin, mergedUrl),
+        label: 'Recommended agent manifest',
+        url: agentUrl,
+        absoluteUrl: absoluteUrl(origin, agentUrl),
         activeSourceCount: activeSources.length,
+      },
+      catalogs: {
+        namespaces: {
+          label: 'Local docs catalog',
+          url: namespacesUrl,
+          absoluteUrl: absoluteUrl(origin, namespacesUrl),
+        } satisfies AgentIndexLink,
+        sources: {
+          label: 'Active imported docs catalog',
+          url: sourcesUrl,
+          absoluteUrl: absoluteUrl(origin, sourcesUrl),
+        } satisfies AgentIndexLink,
       },
       startHere,
       namespaces,
       splitIndexes,
-      activeSources: activeSources.map((source) => ({
-        id: source.id,
-        title: source.title ?? source.url,
-        url: source.url,
-        owner: source.owner,
-        trustNote: source.trust_note,
-        intendedUse: source.intended_use,
-        warning: source.warning,
-        lastReviewedAt: source.last_reviewed_at,
-        promotionReason: source.promotion_reason,
-        lastFetched: source.last_fetched,
-        lastError: source.last_error,
-      })),
-      snippets: buildSnippets(origin, masterUrl, mergedUrl, startHere, splitIndexes[0] ?? null, activeSources.length),
+      activeSources: activeSources.map((source): AgentExternalSourceLink => {
+        const llmsUrl = `/agent/sources/${source.id}/llms.txt`;
+        return {
+          id: source.id,
+          title: source.title ?? source.url,
+          url: source.url,
+          llmsUrl,
+          absoluteLlmsUrl: absoluteUrl(origin, llmsUrl),
+          owner: source.owner,
+          trustNote: source.trust_note,
+          intendedUse: source.intended_use,
+          warning: source.warning,
+          lastReviewedAt: source.last_reviewed_at,
+          promotionReason: source.promotion_reason,
+          lastFetched: source.last_fetched,
+          lastError: source.last_error,
+        };
+      }),
+      snippets: buildSnippets(origin, masterUrl, agentUrl, startHere, splitIndexes[0] ?? null, activeSources.length),
     };
   });
 
@@ -116,7 +156,7 @@ function splitSourceNamespace(name: string): string | null {
 function buildSnippets(
   origin: string,
   masterUrl: string,
-  mergedUrl: string,
+  agentUrl: string,
   startHere: AgentNamespaceLink | null,
   splitIndex: AgentNamespaceLink | null,
   activeSourceCount: number,
@@ -124,25 +164,29 @@ function buildSnippets(
   const snippets = [
     {
       title: 'Start here',
-      text: `Read ${absoluteUrl(origin, masterUrl)} first, then choose the most relevant namespace manifest.`,
+      text: `Read ${absoluteUrl(origin, agentUrl)} first. Choose relevant links by description, then fetch only those entries.`,
+    },
+    {
+      title: 'Local only',
+      text: `Use ${absoluteUrl(origin, masterUrl)} when the task should ignore cached imported docs.`,
     },
   ];
   if (startHere) {
     snippets.push({
-      title: 'Use this namespace',
+      title: 'Use this local doc',
       text: `Use ${startHere.absoluteUrl} for ${startHere.title}. Prefer its linked entries over broad web search.`,
     });
   }
   if (splitIndex) {
     snippets.push({
       title: 'Use split index',
-      text: `For smaller context windows, start with ${splitIndex.absoluteUrl} and then read only the matching split namespace.`,
+      text: `For smaller context windows, start with ${splitIndex.absoluteUrl} and then read only the matching split local doc set.`,
     });
   }
   if (activeSourceCount > 0) {
     snippets.push({
-      title: 'Include trusted external docs',
-      text: `Use ${absoluteUrl(origin, mergedUrl)} when the task needs approved active external sources merged with local docs.`,
+      title: 'Include imported docs',
+      text: `Use ${absoluteUrl(origin, agentUrl)} when the task needs approved active imported docs merged with local docs.`,
     });
   }
   return snippets;

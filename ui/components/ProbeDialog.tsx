@@ -51,7 +51,7 @@ export function ProbeDialog({
   return (
     <div className="dialog-backdrop" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>Add llms.txt source</h3>
+        <h3>Add Imported Doc</h3>
         <div className="row">
           <input
             autoFocus

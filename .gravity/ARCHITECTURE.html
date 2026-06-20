@@ -1,0 +1,266 @@
+<!doctype html>
+<!--
+  ARCHITECTURE.html - operator and agent architecture guide for local-llmstxt-server.
+  This explains how the system is used end to end: collect, compose, validate, serve, consume.
+  Mission and principles live in MISSION.html. Roadmap lives in IMPLEMENTATION_PLAN.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>local-llmstxt-server - Architecture</title>
+<style>
+  :root {
+    --bg:#0A0E1A; --panel:rgba(17,24,43,0.72); --panel-2:rgba(26,36,64,0.82); --line:rgba(255,255,255,0.09);
+    --text-hi:#F3F4F6; --text:#CBD5E1; --text-mid:#9CA3AF; --faint:#717a8c;
+    --accent:#00E5E8; --accent-d:#4FACFE; --amber:#FBBF24; --red:#FF4D6D;
+    --mono:'Fira Code',ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:'Inter',ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0;
+    background:
+      radial-gradient(900px 520px at 10% -8%, rgba(0,242,254,.10), transparent 60%),
+      radial-gradient(820px 480px at 96% -2%, rgba(240,147,251,.08), transparent 55%),
+      #0A0E1A;
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:980px; margin:0 auto; padding:56px 28px 110px; }
+  .logo { display:inline-flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .logo .sq { width:13px; height:13px; border-radius:3px; background:linear-gradient(135deg,var(--accent),var(--accent-d)); box-shadow:0 0 14px rgba(0,229,232,.45); }
+  .logo .k { font-family:var(--mono); font-size:12px; color:var(--faint); letter-spacing:.04em; }
+  h1 {
+    font-size:32px;
+    line-height:1.18;
+    margin:4px 0 8px;
+    color:var(--text-hi);
+    font-weight:700;
+    letter-spacing:-.01em;
+  }
+  .lede { color:var(--text-mid); font-size:16px; margin:0 0 8px; max-width:820px; }
+  h2 {
+    font-size:20px;
+    color:var(--text-hi);
+    margin:48px 0 14px;
+    font-weight:620;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--line);
+  }
+  h2 .n { color:var(--accent); font-family:var(--mono); font-size:14px; margin-right:10px; }
+  h3 { font-size:15px; color:var(--text-hi); margin:24px 0 8px; font-weight:620; }
+  p { margin:10px 0; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  strong { color:var(--text-hi); font-weight:620; }
+  code {
+    font-family:var(--mono);
+    font-size:.86em;
+    color:var(--accent);
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    padding:1px 6px;
+    border-radius:5px;
+  }
+  pre {
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:18px 20px;
+    overflow-x:auto;
+    margin:16px 0;
+    font-family:var(--mono);
+    font-size:12.5px;
+    line-height:1.55;
+    color:var(--text-mid);
+  }
+  pre b { color:var(--accent); font-weight:600; }
+  .toc, .note {
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 20px;
+  }
+  .toc { margin:22px 0 0; }
+  .toc ol { margin:0; columns:2; column-gap:32px; font-size:13.5px; }
+  .toc a { color:var(--text-mid); }
+  .toc a:hover { color:var(--accent); }
+  .note { border-left:3px solid var(--accent); border-radius:0 8px 8px 0; margin:18px 0; font-size:14px; }
+  .note.warn { border-left-color:var(--amber); }
+  table { width:100%; border-collapse:collapse; margin:16px 0; font-size:13.5px; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--faint); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; }
+  ul, ol { margin:10px 0; padding-left:22px; }
+  li { margin:5px 0; }
+  footer { margin-top:70px; padding-top:18px; border-top:1px solid var(--line); color:var(--faint); font-size:12.5px; }
+  @media (max-width:680px){ .toc ol { columns:1; } .wrap { padding:34px 18px 80px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><span class="sq"></span><span class="k">local-llmstxt-server</span></div>
+    <h1>Architecture</h1>
+    <p class="lede">This system turns scattered documentation into curated, validated, locally served <code>llms.txt</code> doc sets that coding agents can read selectively.</p>
+    <div class="toc">
+      <ol>
+        <li><a href="#model">System model</a></li>
+        <li><a href="#roles">Agent roles</a></li>
+        <li><a href="#ingestion">Ingestion paths</a></li>
+        <li><a href="#namespace">Namespace contract</a></li>
+        <li><a href="#serving">Serving model</a></li>
+        <li><a href="#consumer">Consumer instruction</a></li>
+        <li><a href="#state">State and trust</a></li>
+      </ol>
+    </div>
+  </header>
+
+  <h2 id="model"><span class="n">01</span>System Model</h2>
+  <p><strong>The core loop is agent-assisted ingestion, local curation, validated doc-set output, then selective agent consumption.</strong> A coding agent can help collect and normalize docs, but the server is the stable place where the curated result lives.</p>
+  <pre><b>source material</b>
+  URLs, OpenAPI, existing llms.txt, docs pages, PDFs, decks, pasted specs
+        |
+        v
+<b>producer agent</b>
+  routes input, fetches or reads material, asks for missing metadata
+        |
+        v
+<b>data/own/&lt;local-doc&gt;/</b>
+  llms.txt manifest + focused markdown entry files
+        |
+        v
+<b>local server</b>
+  serves /&lt;namespace&gt;/llms.txt and linked entries
+        |
+        v
+<b>consumer agent</b>
+  reads manifest first, fetches only relevant entries, uses them as context</pre>
+  <div class="note">
+    The server is not meant to replace source documentation. It creates an agent-ready control surface over docs humans have chosen to trust.
+  </div>
+
+  <h2 id="roles"><span class="n">02</span>Agent Roles</h2>
+  <table>
+    <thead><tr><th>Role</th><th>Skill</th><th>Job</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Producer agent</td>
+        <td><code>docs-import</code></td>
+        <td>Handles URL inputs that the CLI can probe, fetch, parse, crawl, or render.</td>
+      </tr>
+      <tr>
+        <td>Producer agent</td>
+        <td><code>llms-compose</code></td>
+        <td>Handles local material the agent reads directly: pptx, PDF, pasted text, local markdown, internal notes, or operator-pasted rendered SPA content.</td>
+      </tr>
+      <tr>
+        <td>Protected-source helper</td>
+        <td><code>cookie-extract</code></td>
+        <td>Runs human-in-the-loop login, lets the operator authenticate in a browser, then extracts selected session cookies.</td>
+      </tr>
+      <tr>
+        <td>Protected-source helper</td>
+        <td><code>windows-ca-web-fetch</code></td>
+        <td>Fetches URLs on Windows with custom CA bundles, custom headers, cookies, and cookie jars.</td>
+      </tr>
+      <tr>
+        <td>Consumer agent</td>
+        <td><code>llms-txt-reader</code></td>
+        <td>Reads a served manifest, selects relevant links by description, fetches only needed entries, and grounds work in those docs.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Producer skills are for collecting and building Local Docs. Consumer agents do not need those producer skills unless they are also importing documentation.</p>
+
+  <h2 id="ingestion"><span class="n">03</span>Ingestion Paths</h2>
+  <p><code>ingest/SPEC.md</code> is the front door for deciding which path to use.</p>
+  <table>
+    <thead><tr><th>Input</th><th>Route</th><th>Output</th></tr></thead>
+    <tbody>
+      <tr><td>Existing <code>llms.txt</code></td><td><code>docs-import</code></td><td>Imported Docs or Local Docs, depending on operator intent.</td></tr>
+      <tr><td>OpenAPI / Swagger URL</td><td><code>docs-import openapi</code></td><td>Local Docs with auth, base URL, endpoints, parameters, and examples when present.</td></tr>
+      <tr><td>Server-rendered docs page/site</td><td><code>docs-import probe</code>, then crawl or single-page import</td><td>Normalized markdown entries and a manifest.</td></tr>
+      <tr><td>CSR/SPA docs page</td><td>Markdown twin, then <code>fetch-clean --render</code>, then operator paste into <code>llms-compose</code></td><td>Rendered content converted into Local Docs pages.</td></tr>
+      <tr><td>PDF, pptx, pasted spec, local files</td><td><code>llms-compose</code></td><td>Agent-composed Local Docs after metadata interview.</td></tr>
+      <tr><td>Login, SSO, corporate CA, custom cookies</td><td><code>cookie-extract</code> and/or <code>windows-ca-web-fetch</code>, then a producer skill</td><td>Authenticated bytes or rendered text that can be imported or composed.</td></tr>
+    </tbody>
+  </table>
+  <p>The rule is simple: URLs are probed first; local material is read by the composing agent; missing metadata is asked for, not invented.</p>
+
+  <h2 id="namespace"><span class="n">04</span>Local Docs Contract</h2>
+  <p>Local Docs are the self-written serving units. Internally each one is a namespace folder under <code>data/own/&lt;namespace&gt;/</code> and contains one manifest plus linked markdown entries.</p>
+  <pre>data/own/
+  billing-api/
+    llms.txt
+    auth.md
+    invoices.md
+    payments.md</pre>
+  <p>The manifest is an index for selection. Entry files are the payload. A good local doc set lets another agent decide what to fetch without reading every entry.</p>
+  <pre># Billing API
+
+&gt; Internal billing service - create invoices, record payments, query balances.
+
+&gt; Source: internal Billing API deck v2. Imported 2026-06-20. Base URL: https://billing.example/v2. Auth: Bearer, see auth.md.
+
+## Reference
+
+- [Authentication](/api/entries/get?name=billing-api/auth.md): Bearer token scheme, scopes, token lifetime
+- [Invoices](/api/entries/get?name=billing-api/invoices.md): create, fetch, and void invoices
+- [Payments](/api/entries/get?name=billing-api/payments.md): record and reconcile payments against invoices</pre>
+  <p>Validate each local doc set before handing it to another agent:</p>
+  <pre>pnpm docs-import check &lt;namespace&gt;</pre>
+
+  <h2 id="serving"><span class="n">05</span>Serving Model</h2>
+  <p>Run the app locally or on the intranet:</p>
+  <pre>pnpm dev</pre>
+  <table>
+    <thead><tr><th>URL</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td><code>http://localhost:3000/agent/llms.txt</code></td><td>Recommended agent entrypoint. Local master merged with active trusted Imported Docs.</td></tr>
+      <tr><td><code>http://localhost:3000/agent/namespaces</code></td><td>JSON catalog of Local Docs and their manifest URLs.</td></tr>
+      <tr><td><code>http://localhost:3000/agent/sources</code></td><td>JSON catalog of active Imported Docs and their source-specific manifest URLs.</td></tr>
+      <tr><td><code>http://localhost:3000/agent/sources/:id/llms.txt</code></td><td>One active Imported Docs manifest, for example only ADK or only LangChain.</td></tr>
+      <tr><td><code>http://localhost:3000/llms.txt</code></td><td>Local master manifest only. Use when imported cached docs should be ignored.</td></tr>
+      <tr><td><code>http://localhost:3000/llms.txt?merge=true</code></td><td>Legacy merged view. Prefer <code>/agent/llms.txt</code> for new agent instructions.</td></tr>
+      <tr><td><code>http://localhost:3000/&lt;namespace&gt;/llms.txt</code></td><td>Focused Local Docs manifest. Prefer this when the task has a known domain.</td></tr>
+      <tr><td><code>http://localhost:3000/api/entries/get?name=&lt;namespace&gt;/&lt;file&gt;.md</code></td><td>One local markdown entry linked from a manifest.</td></tr>
+      <tr><td><code>http://localhost:3000/api/content/&lt;hash&gt;</code></td><td>Cached normalized external markdown by content hash.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="consumer"><span class="n">06</span>Consumer Instruction</h2>
+  <p>A worker agent that only needs to use the served docs needs the <code>llms-txt-reader</code> behavior. It should not import, crawl, or compose unless the task explicitly asks it to collect docs. Use a specific <code>/&lt;namespace&gt;/llms.txt</code> Local Docs manifest or <code>/agent/sources/:id/llms.txt</code> Imported Docs manifest when the task already has a narrow domain.</p>
+  <pre>Use http://localhost:3000/agent/llms.txt as the source manifest.
+Read the manifest first.
+Choose only relevant linked entries by their descriptions.
+Fetch those entries and use them as the authoritative docs for this task.
+Do not fetch every link unless the task requires broad coverage.</pre>
+  <p>That is the main handoff between this control plane and other coding agents.</p>
+
+  <h2 id="state"><span class="n">07</span>State And Trust</h2>
+  <table>
+    <thead><tr><th>Path</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>data/own/</code></td><td>Human-curated Local Docs. This is source-of-truth content worth tracking when it is not private.</td></tr>
+      <tr><td><code>data/cache/</code></td><td>Normalized markdown fetched from remote links. Reproducible cache.</td></tr>
+      <tr><td><code>data/index.sqlite</code></td><td>Imported Docs registry, lifecycle state, metadata, refresh history, and tombstones.</td></tr>
+      <tr><td><code>.claude/skills/</code></td><td>Project-local Claude Code skill playbooks.</td></tr>
+      <tr><td><code>.codex/skills/</code></td><td>Project-local Codex skill playbooks.</td></tr>
+    </tbody>
+  </table>
+  <p>Imported Docs are human-curated. An import can be probed, added as trial, promoted to active, archived, or removed. Active imports are the ones exposed in merged agent views.</p>
+  <div class="note warn">
+    Do not expose this server directly to the public internet. It is designed for trusted local or intranet use. Mutating API routes can be protected with <code>WRITE_TOKEN</code>.
+  </div>
+
+  <footer>
+    local-llmstxt-server - architecture guide. Mission: <code>MISSION.html</code>. Roadmap: <code>IMPLEMENTATION_PLAN.md</code>. Current state: <code>../CONTEXT.md</code>.
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Ungrouped docs
+
+> Root-level docs that have not been split into a dedicated namespace yet.
+
+Use this namespace as a holding area for local docs before they deserve a more specific namespace.
+
+## APIs
+
+- [Example API](/api/entries/get?name=ungrouped-docs/apis/example.md): A placeholder for your own API docs
+
+## Libraries
+
+- [Example Lib](/api/entries/get?name=ungrouped-docs/libs/example.md): A placeholder for your own library docs
+
+## Test
+
+- [test/exapmle.md](/api/entries/get?name=ungrouped-docs/test/exapmle.md): Scratch test note

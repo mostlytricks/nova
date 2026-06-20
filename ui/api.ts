@@ -20,6 +20,36 @@ export interface Source {
   linkCount?: number;
 }
 
+export type ManagedDocState = 'draft' | 'active' | 'archived';
+export type LocalDocType = 'api' | 'website' | 'library' | 'notes';
+
+export interface NamespaceMeta {
+  state: ManagedDocState;
+  doc_type: LocalDocType;
+  origin_url: string | null;
+  base_url: string | null;
+  auth_summary: string | null;
+  version: string | null;
+  known_gaps: string | null;
+  tags: string[];
+  notes: string;
+  owner: string | null;
+  trust_note: string | null;
+  intended_use: string | null;
+  warning: string | null;
+  last_reviewed_at: number | null;
+  promotion_reason: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface NamespaceHistoryEvent {
+  id: number;
+  at: number;
+  type: 'namespace_created' | 'meta_updated' | 'llms_saved' | 'note_updated' | 'entry_saved' | 'entry_deleted';
+  detail: string;
+}
+
 export interface Link {
   id: number;
   source_id: number;
@@ -121,8 +151,13 @@ export interface AgentNamespaceLink extends AgentIndexLink {
 
 export interface AgentIndex {
   generatedAt: number;
+  recommended: AgentIndexLink;
   master: AgentIndexLink;
   mergedExternal: AgentIndexLink & { activeSourceCount: number };
+  catalogs: {
+    namespaces: AgentIndexLink;
+    sources: AgentIndexLink;
+  };
   startHere: AgentNamespaceLink | null;
   namespaces: AgentNamespaceLink[];
   splitIndexes: AgentNamespaceLink[];
@@ -130,6 +165,8 @@ export interface AgentIndex {
     id: number;
     title: string;
     url: string;
+    llmsUrl: string;
+    absoluteLlmsUrl: string;
     owner: string | null;
     trustNote: string | null;
     intendedUse: string | null;
@@ -178,6 +215,10 @@ export const api = {
     }),
   refreshSource: (id: number) =>
     json<{ ok: true }>(`/api/sources/${id}/refresh`, { method: 'POST' }),
+  getSourceLlms: (id: number) =>
+    fetch(`/api/sources/${encodeURIComponent(id)}/llms`).then((r) =>
+      r.ok ? r.text() : Promise.reject(`${r.status}: ${r.statusText}`),
+    ),
   refreshLink: (id: number) =>
     json<{ ok: true }>(`/api/links/${id}/refresh`, { method: 'POST' }),
   linkContent: (id: number) =>
@@ -207,6 +248,23 @@ export const api = {
         summary: string | null;
         note?: string | null;
         entryCount?: number;
+        state: ManagedDocState;
+        doc_type: LocalDocType;
+        origin_url: string | null;
+        base_url: string | null;
+        auth_summary: string | null;
+        version: string | null;
+        known_gaps: string | null;
+        tags: string[];
+        notes: string;
+        owner: string | null;
+        trust_note: string | null;
+        intended_use: string | null;
+        warning: string | null;
+        last_reviewed_at: number | null;
+        promotion_reason: string | null;
+        created_at: number;
+        updated_at: number;
       }[];
     }>('/api/namespaces'),
   listNamespaceHealth: () =>
@@ -219,6 +277,15 @@ export const api = {
       `/api/namespaces/${encodeURIComponent(name)}/note`,
       { method: 'PUT', body: JSON.stringify({ note }) },
     ),
+  getNamespaceMeta: (name: string) =>
+    json<NamespaceMeta>(`/api/namespaces/${encodeURIComponent(name)}/meta`),
+  patchNamespaceMeta: (name: string, body: Partial<NamespaceMeta>) =>
+    json<NamespaceMeta>(`/api/namespaces/${encodeURIComponent(name)}/meta`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  getNamespaceHistory: (name: string) =>
+    json<{ namespace: string; events: NamespaceHistoryEvent[] }>(`/api/namespaces/${encodeURIComponent(name)}/history`),
   getStats: () =>
     json<{
       namespaces: { count: number; items: { name: string; title: string; linkCount: number }[] };
@@ -229,7 +296,7 @@ export const api = {
       oldestFetch: number | null;
       generatedAt: number;
     }>('/api/stats'),
-  createNamespace: (body: { name: string; title?: string; summary?: string }) =>
+  createNamespace: (body: { name: string; title?: string; summary?: string; doc_type?: LocalDocType }) =>
     json<{ ok: true; name: string }>('/api/namespaces', {
       method: 'POST',
       body: JSON.stringify(body),
