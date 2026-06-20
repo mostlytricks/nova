@@ -17,6 +17,24 @@ Internal-network server that hosts your own `llms.txt` (with namespaced sub-mani
 
 No `ARCHITECTURE.html` — "how it's built" lives in this file's **Entry Points** section.
 
+## Skills & ingestion SPECs (the agent router)
+
+`.claude/skills/*` are task playbooks for an agent working *with* this server; the two repo-root `SPEC.*.md` files are the contracts those skills obey. **Read the SPEC before running the matching skill.** One concern, one home — the skills are *procedures*, the SPECs are *requirements*; link, don't restate.
+
+**Front door:** `SPEC.ingest-router.md` decides which lane handles a given input (URL vs local material vs CSR/SPA). Start there for any ingest task.
+
+| Skill | Role | Use when |
+|---|---|---|
+| `docs-import` | **Producer** (URL lane) | Input is a fetchable URL — doc site, OpenAPI/Swagger, an existing `llms.txt`. The project CLI fetches/parses; agent makes editorial calls. |
+| `llms-compose` | **Producer** (local lane) | Input is local material the agent reads itself — pptx, PDF, pasted/clipboard text, local files — *or* a CSR/SPA URL the CLI couldn't render. Centers on a metadata interview that **asks, never invents**. |
+| `llms-txt-reader` | **Consumer** | Grounding an answer in an `llms.txt` manifest (including this server at `localhost:3000`). Fetches the manifest, follows only the relevant links. |
+| `cookie-extract` | **Protected-source fetch** | A target page sits behind a login/SSO. HITL: opens a headed browser, user logs in, extracts session cookies. Uses Playwright (same dep family as the render rung). |
+| `windows-ca-web-fetch` | **Protected-source fetch** | A URL needs a corporate/private CA bundle, `Authorization` header, or session cookies. Windows `curl.exe` wrapper. Pairs with `cookie-extract` to feed a producer skill. |
+
+**SPEC contracts:**
+- `SPEC.ingest-router.md` — front door: input → lane, plus the 3-rung CSR/SPA ladder (markdown twin → headless render → operator paste). A login/CA-walled page is effectively a fourth path: `cookie-extract` + `windows-ca-web-fetch` get the bytes, then a producer skill ingests them.
+- `SPEC.dev-docs-llms-txt.md` — the output contract + quality gate every produced namespace must satisfy (manifest/entry rules, base-URL/auth-once for APIs, "don't invent — ask"). Both producer skills defer to it.
+
 ## Stack
 
 - **Language / runtime:** TypeScript 5.6, Node **22 LTS** (or newer), `pnpm` 9 (`packageManager` pinned in `package.json`).
@@ -51,7 +69,7 @@ No tests yet. Verify changes by running `pnpm typecheck` (covers both `tsconfig.
 
 ## Conventions
 
-- **Branch / commit style:** work has gone straight to `master` (now ~5 commits, pushed to `origin`); messages so far are terse, casual one-liners (`init`, `git ignore`, `modified`, `better.`) — no strict convention. Prefer imperative one-liners going forward.
+- **Branch / commit style:** work has gone straight to `master` (now ~8 commits, pushed to `origin`); messages so far are terse, casual one-liners (`init`, `git ignore`, `modified`, `better.`) — no strict convention. Prefer imperative one-liners going forward.
 - **Formatter / linter:** none configured. Don't introduce one without asking.
 - **Code layout:**
   - `server/index.ts` — Fastify entry, registers routes + starts the scheduler.
@@ -68,7 +86,7 @@ No tests yet. Verify changes by running `pnpm typecheck` (covers both `tsconfig.
 - **`data/cache/` and `data/index.sqlite` are regenerable** — fine to delete during debugging. `data/own/` is the source of truth and should be git-tracked once you have content worth keeping.
 - **White page at `localhost:5173`** typically means a stale `node` is holding the port and Vite quietly bound to `5174`. README has the kill-port recipe.
 - **`.claude/` directory at the repo root** holds local Claude Code config — already covered by `.gitignore`.
-- **`IMPLEMENTATION_PLAN.md`** at the repo root is the 8-phase control-plane roadmap (Phases 1–7 are **done**; Phase 8 = Search is next). Read before changing how docs are split across namespaces or starting a new phase.
+- **`IMPLEMENTATION_PLAN.md`** at the repo root is the 8-phase control-plane roadmap (Phases 1–7 **done**; Phase 8 = Search queued) plus **Track R** (ingestion router & CSR/SPA handling — complete locally, pending commit). Read before changing how docs are split across namespaces, touching the ingest path, or starting a new phase.
 
 ## Entry Points
 

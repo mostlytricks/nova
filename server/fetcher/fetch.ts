@@ -118,7 +118,7 @@ export async function fetchAndNormalize(
   return { ...result, hash };
 }
 
-function htmlToMarkdown(html: string, url: string): string {
+export function htmlToMarkdown(html: string, url: string): string {
   try {
     const dom = new JSDOM(html, { url });
     const reader = new Readability(dom.window.document);

@@ -18,6 +18,12 @@ Requires Node **22 LTS** (or newer) and `pnpm`.
 pnpm install
 ```
 
+If you need to import client-side-rendered documentation pages with `pnpm docs-import fetch-clean <url> --render`, install the optional browser binary after dependencies:
+
+```bash
+pnpm exec playwright install chromium
+```
+
 ## Run
 
 **Development** (server + UI with hot reload):

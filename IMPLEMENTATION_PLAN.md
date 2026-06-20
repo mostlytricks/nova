@@ -546,6 +546,50 @@ Consider SQLite FTS if simple search is too slow. Do not add heavy search infras
 
 ---
 
+## Track R — Ingestion Router & CSR/SPA Handling
+
+> A parallel track (not one of the numbered phases) that runs **ahead of Phase 8**. It hardens the *input side* of the control plane: turning any input — URL, swagger, pptx, PDF, pasted text, or a horrible client-side-rendered SPA — into a namespace that satisfies `SPEC.dev-docs-llms-txt.md`. Read `SPEC.ingest-router.md` and `SPEC.dev-docs-llms-txt.md` before touching this.
+
+### Why
+
+Inputs grew beyond clean URLs. Two failure modes had to be closed: (1) arbitrary local material (pptx/paste/PDF) had no ingestion path, and (2) **CSR/SPA pages** returned an empty shell from static fetch, failing *silently*. Both `docs-import`'s `fetch-clean` and a plain web fetch are static-HTML only — neither runs JS.
+
+### Locked decisions
+
+- [x] **Two ingestion lanes, one output contract.** `docs-import` (URL → CLI fetch/parse) and `llms-compose` (local material → agent reads it). Both must satisfy `SPEC.dev-docs-llms-txt.md`. Front door = `SPEC.ingest-router.md`.
+- [x] **CSR/SPA = a 3-rung ladder, graceful degradation** (chosen over CLI-only render or paste-only): `mdTwin` shortcut → headless render → operator reader-mode paste. Prefer the cheapest lossless rung.
+- [x] **`llms-compose` produces no new output shape** — same `data/own/<ns>/` namespace; only the reader differs. It centers on a metadata interview that fills the gaps raw material leaves (base URL, auth, summary, provenance) — **asks, never invents**.
+
+### Increment 1 — Router + CSR detection + md-twin shortcut — **DONE 2026-06-20** (uncommitted)
+
+Shipped: `probe` (in `server/bin/docs-import.ts`) returns `rendering: 'ssr' | 'csr'` and `mdTwin: string | null`. `detectCsr()` flags client-side rendering from an empty mount container or low rendered-text + multiple scripts (framework markers only corroborate, so SSG-with-content is not a false positive). `findMdTwin()` discovers `/page.md` shortcuts. Authored `SPEC.dev-docs-llms-txt.md` (output contract + quality gate), `SPEC.ingest-router.md` (front door + ladder), and the `llms-compose` skill (DRAFT); wired the `docs-import` skill to check `rendering` first.
+
+Verified: `pnpm typecheck` clean; live `fastify.dev` stays `ssr`; a local SPA-shell server reports `csr`, finds the twin when present and emits the paste-fallback warning when absent.
+
+### Increment 2 — Headless render rung (opt-in dep) — **DONE 2026-06-20** (uncommitted)
+
+The middle rung: only reached when `rendering=csr` AND no `mdTwin`.
+
+Shipped: `pnpm docs-import fetch-clean <url> --render` lazy-imports Playwright Chromium, loads the page with `waitUntil: 'networkidle'`, optionally waits for `--wait-for <selector>`, then passes the rendered DOM through the shared `htmlToMarkdown(html, url)` Readability/Turndown pipeline. Playwright is declared as a dev dependency and loaded only for `--render`; the README documents `pnpm exec playwright install chromium`. Missing package/browser paths exit non-zero with install guidance and point operators to the paste rung.
+
+Verification: `pnpm typecheck`; `fetch-clean <real-CSR-doc-page> --render` yields non-junk markdown that passes `passesSanity`; the missing-dep path prints actionable guidance and exits non-zero.
+
+### Increment 3 — Prove + drop DRAFT + commit — **DONE 2026-06-20** (uncommitted)
+
+Dry-run completed with the local Track R spec files as real local material. `llms-compose` produced `data/own/ingestion-router/`, and `pnpm docs-import check ingestion-router` reports healthy with 3 links, 3 entries, and 0 warnings. Removed the `DRAFT.` marker from `.claude/skills/llms-compose/SKILL.md`. Remaining action: commit the whole slice together.
+
+### Touchpoints
+
+| File | Work |
+|---|---|
+| `server/bin/docs-import.ts` | `probe` CSR/twin fields (done); `fetch-clean --render` (done). |
+| `server/fetcher/fetch.ts` | Expose `htmlToMarkdown(html, url)` for the render path (done). |
+| `SPEC.ingest-router.md` | Front door + ladder (done). Canonical for routing. |
+| `SPEC.dev-docs-llms-txt.md` | Output contract + quality gate (done). Canonical for "what good looks like". |
+| `.claude/skills/{docs-import,llms-compose}/SKILL.md` | Procedures; both link the router (done; drop `llms-compose` DRAFT in Inc 3). |
+
+---
+
 ## Phase Order And Agent Handoff
 
 Agents should work in this order unless the user explicitly redirects:
@@ -571,4 +615,9 @@ For each phase:
 
 ## Immediate Next Step
 
-Implement **Phase 8 — Search**, starting with a fast read-only search endpoint over own content, namespaces, and cached source metadata.
+Two open threads — **Track R runs ahead of Phase 8**:
+
+1. **Track R commit** (active) — commit the completed ingestion-router slice.
+2. **Phase 8 — Search** (queued) — a fast read-only search endpoint over own content, namespaces, and cached source metadata.
+
+A fresh agent picking up here should commit Track R, then begin Phase 8 Search. Read the Phase 8 section and inspect the existing routes before editing.

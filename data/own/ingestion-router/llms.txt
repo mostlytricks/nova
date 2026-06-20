@@ -1,0 +1,11 @@
+# local-llmstxt-server Ingestion Router
+
+> Project-local ingestion rules for routing URLs, local material, and CSR/SPA documentation into agent-ready llms.txt namespaces.
+
+> Source: internal project specs `SPEC.ingest-router.md` and `SPEC.dev-docs-llms-txt.md`. Imported 2026-06-20.
+
+## Reference
+
+- [Input Routing](/api/entries/get?name=ingestion-router/input-routing.md): choose docs-import or llms-compose based on URL, local material, mixed input, and CSR/SPA probe results
+- [Namespace Output Contract](/api/entries/get?name=ingestion-router/namespace-contract.md): required manifest and entry shape for agent-ready local namespaces
+- [Quality Gate](/api/entries/get?name=ingestion-router/quality-gate.md): checklist and checker expectations before declaring a composed namespace ready

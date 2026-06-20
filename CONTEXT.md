@@ -1,26 +1,26 @@
 # CONTEXT — local-llmstxt-server
 
-Last touched: 2026-06-07
+Last touched: 2026-06-20
 
 ## Completed
-- **Basic write protection** (2026-06-07, **uncommitted — in working tree**). Added `WRITE_TOKEN` (config) + a shared guard `requireWriteAccess` in the new `server/write-protect.ts`, called at the top of every mutating handler in `routes/{entries,llms,sources}.ts` (per-handler, not a global hook). Verified with `pnpm typecheck`, `pnpm build`, a `401` on anonymous `PUT /api/entries`, and `200` with `Authorization: Bearer phase7-token`.
-- **Snapshot and refresh history** (2026-06-07, **uncommitted — in working tree**). Added source/link refresh history tables, preserved link IDs during source manifest reconciliation, recorded refresh attempts and content-change snapshots, and surfaced read-only history on `GET /api/sources/:id/history` and `GET /api/links/:id/history` plus the source detail UI. Verified with `pnpm typecheck`, `pnpm build`, and live endpoint checks against source `2`. → Walkthrough (covers this + trust metadata): `docs/walkthroughs/2026-06-07-trust-metadata-and-refresh-history.md`.
-- **Trust metadata for external sources** (2026-06-06, **uncommitted — in working tree**). Nullable source trust fields (`owner`, `trust_note`, `intended_use`, `warning`, `last_reviewed_at`, `promotion_reason`), startup schema migration, source API patch/create support, promotion-reason prompt, source detail editors, dashboard trust summary, agent-index trust fields. Verified nullable existing rows, reversible PATCH, `/api/agent/index`, `pnpm typecheck`, and `pnpm build` when the work was done.
-- **Read-only agent view + health signals** (2026-06-04→06, **committed & pushed**, `6b6b9c4`). `GET /api/agent/index` + `/agent` UI (copyable master/merged/namespace URLs), read-only health API + dashboard/sidebar badges, shared `server/health.ts`, and `pnpm docs-import check <ns> | --all | --json`.
-- **Docs-split CLI + mission/roadmap reset** (2026-06-04, **committed & pushed**, `0a3a02e`/`3477bce`). `pnpm docs-import split <ns>` (`--by sections|path|manual`, `--dry-run`); added `MISSION.html` and expanded `IMPLEMENTATION_PLAN.md` into the 8-phase control-plane roadmap; renamed the old split-plan file into the standard `IMPLEMENTATION_PLAN.md` slot.
+- **Ingestion router + CSR/SPA handling — Track R complete locally** (2026-06-20, **uncommitted**). `probe` now returns `rendering: 'ssr'|'csr'` + `mdTwin` (pre-rendered markdown twin): `detectCsr` flags client-side rendering from empty mount container / low-text+scripts (markers only corroborate, so SSG with embedded content is not a false positive), and `findMdTwin` discovers `/page.md` shortcuts. Added `SPEC.ingest-router.md` (the input→lane front door + 3-rung SPA ladder: twin → render → operator paste) and wired both skills to it. Added opt-in `pnpm docs-import fetch-clean <url> --render` with lazy Playwright Chromium, optional `--wait-for <selector>`, shared `htmlToMarkdown(html, url)`, and graceful missing-dep/browser guidance. Proved `llms-compose` by composing the local Track R specs into `data/own/ingestion-router/`; `pnpm docs-import check ingestion-router` reports healthy. Verified: `pnpm typecheck` clean; live probe of `fastify.dev` stays `ssr`; a local SPA-shell server correctly reports `csr` + finds/omits the twin with the right fallback warning; local CSR render smoke test produced cleaned markdown from the rendered DOM.
+- **Authoring contract + composer skill** (2026-06-20, **uncommitted — in working tree**). Wrote `SPEC.dev-docs-llms-txt.md` (repo root) — the agent-loadable requirements + quality gate for *dev/API* `llms.txt` namespaces (manifest/entry rules, dev-API specifics like base-URL/auth-once, the required-metadata gap list, "don't invent — ask"). Added `.claude/skills/llms-compose/SKILL.md` — composes a namespace from *arbitrary local material the agent reads itself* (pptx/clipboard/PDF/text/local files) via a batched metadata interview; defers to the SPEC on all rules. Dry-run completed against local Track R specs.
+- **Feasibility review vs new mission** (2026-06-20). Confirmed fit: UC1 (cache an external `llms.txt` like litellm → serve on intranet) and the swagger/webpage half of UC2 are **already built**; the pptx/clipboard half was the only gap, now covered by `llms-compose`. New open problem surfaced: input can be **CSR/SPA webpages** that `fetch-clean` (static HTML → Readability) can't render.
+- **Phases 1-7 shipped** (through 2026-06-07, **committed & pushed**, head `80b631c`). Docs-split CLI, health checks, dashboard signals, agent view, trust metadata, refresh history, write protection. Earlier CONTEXT calling these "uncommitted" was stale — they landed in `a1ffaa5`/`80b631c`.
 
 ## Current State
-- Runs locally via `pnpm dev` (UI on 5173, API on 3000). `pnpm typecheck` + `pnpm build` are the only verification (no tests).
-- Git: **5 commits on `master`, even with `origin/master` (all pushed)** at github.com/mostlytricks/local-llmstxt-server. Working tree has **three features in flight, uncommitted** — the trust-metadata changes, the new refresh-history changes, and basic write protection plus in-progress doc edits.
-- `IMPLEMENTATION_PLAN.md` Phases 1-7 are implemented; Phase 8 (Search) is the next arc.
-- SQLite at `data/index.sqlite` is live (WAL files present), so the scheduler has run at least once.
+- Runs locally via `pnpm dev` (UI 5173, API 3000). `pnpm typecheck` passes clean (server + UI). No tests.
+- Git: **8 commits on `master`, even with `origin/master`**. Working tree is uncommitted: `SPEC.dev-docs-llms-txt.md`, `SPEC.ingest-router.md`, the `llms-compose` skill, edits to `docs-import` skill + `server/bin/docs-import.ts`, `server/fetcher/fetch.ts`, `package.json`, `pnpm-lock.yaml`, `README.md`, and refreshed `CONTEXT.md`.
+- CSR/SPA strategy decided = **ladder** (twin → headless render → operator paste). Track R implementation is complete locally and ready to commit.
+- `IMPLEMENTATION_PLAN.md` Phase 8 (Search) is still the unstarted roadmap arc and becomes the next implementation target after committing Track R.
 
 ## Next Step
-- Commit the in-flight **trust-metadata**, **refresh-history**, and **basic write protection** features, then begin **Phase 8 — Search**.
+- Commit the whole ingestion-router slice, then start **Phase 8 — Search**.
 
 ---
 
 <!-- Notes:
 - No formatter/linter configured — don't introduce one without asking.
-- Default branch is `master`, not `main`. Per-PR commands need to use the right base.
+- Default branch is `master`, not `main`.
+- `llms-compose` is DRAFT until dry-run on a real deck/page.
 -->

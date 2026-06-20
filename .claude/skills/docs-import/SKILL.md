@@ -24,12 +24,18 @@ The user's running `local-llmstxt-server` will serve these:
 
 ```bash
 pnpm docs-import probe <url>
-# → JSON: { kind, rootUrl, title, summary, suggestedNamespace, seedUrls, openapiSpecUrl, warnings }
+# → JSON: { kind, rootUrl, title, summary, suggestedNamespace, seedUrls, openapiSpecUrl, rendering, mdTwin, warnings }
 # `kind` is one of: openapi | llmstxt | sitemap | nav | single
+# `rendering` is 'ssr' | 'csr'  — 'csr' means content is NOT in static HTML (see SPA ladder below)
+# `mdTwin` is a pre-rendered markdown URL for the root page, or null
 
 pnpm docs-import fetch-clean <url>
 # → stdout: clean markdown (Readability + Turndown, sanity-checked)
 # → exit 1 if the page is junk (too short, leaked HTML, no real content) — skip and continue
+
+pnpm docs-import fetch-clean <url> --render [--wait-for <selector>]
+# → same output, but first renders the page in headless Chromium for CSR/SPAs
+# → requires Playwright + Chromium (`pnpm install`; `pnpm exec playwright install chromium`)
 
 pnpm docs-import openapi <spec-url>
 # → JSON: { info, servers, securitySchemes, tags: [{ name, description, endpoints: [...] }] }
@@ -57,7 +63,10 @@ If the user says "just go," default to mode A with the suggested namespace and s
 pnpm docs-import probe <url>
 ```
 
-Read the JSON. Branch on `kind`:
+Read the JSON. **Check `rendering` first**, then branch on `kind`:
+
+- **`rendering: "csr"`** → the page is a client-side-rendered SPA; static fetch yields an empty shell. **Do not crawl it directly.** Follow the **SPA ladder** in `SPEC.ingest-router.md`: prefer `probe.mdTwin` (fetch it with `fetch-clean` and treat as normal), else `fetch-clean <url> --render` (Increment 2), else hand off to the **`llms-compose`** skill via operator reader-mode paste. The `warnings` field spells out which rung applies.
+- **`rendering: "ssr"`** → content is in the HTML; branch on `kind` as normal:
 
 | `kind` | What to do |
 |---|---|
@@ -235,4 +244,6 @@ Imported <namespace> from <rootUrl>
 
 ## Reference
 
-Full background: `docs/agent-guide.md` in this project. Re-read it if the source site behaves unexpectedly.
+- `SPEC.ingest-router.md` — the front door: input → lane, and the SPA ladder for `rendering: "csr"`.
+- `SPEC.dev-docs-llms-txt.md` — the output contract + quality gate every namespace must satisfy.
+- `docs/agent-guide.md` — full background; re-read it if the source site behaves unexpectedly.

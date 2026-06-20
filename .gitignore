@@ -11,6 +11,7 @@ data/index.sqlite-*
 # operator content — keep example seeds, ignore your private docs
 data/own/*
 !data/own/demos/
+!data/own/ingestion-router/
 
 # Claude Code: project skills are committed, local settings aren't
 .claude/settings.local.json

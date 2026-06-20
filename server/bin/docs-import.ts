@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { fetchMarkdown } from '../fetcher/fetch.js';
+import { fetchMarkdown, htmlToMarkdown } from '../fetcher/fetch.js';
 import { OWN_DIR } from '../config.js';
 import { checkAllNamespaces, checkNamespaceHealth, type NamespaceHealthReport } from '../health.js';
 import { parseLlmsTxt, serializeLlmsTxt, type LlmsDoc, type LlmsLink } from '../parser.js';
@@ -97,6 +97,10 @@ interface ProbeResult {
   suggestedNamespace: string;
   seedUrls: string[];
   openapiSpecUrl: string | null;
+  /** 'csr' means the page renders client-side; static fetch likely yields an empty shell. */
+  rendering: 'ssr' | 'csr';
+  /** A pre-rendered markdown twin of the root page, if one exists (sidesteps rendering). */
+  mdTwin: string | null;
   warnings: string[];
 }
 
@@ -196,6 +200,63 @@ function extractNavLinks(html: string, root: string): string[] {
   return [...urls];
 }
 
+/** Hydration/data markers that betray a JS-framework page (corroborating, not decisive). */
+const CSR_MARKERS = [
+  '__NEXT_DATA__',
+  'window.__NUXT__',
+  '__remixContext',
+  'window.__sveltekit',
+  'window.__INITIAL_STATE__',
+];
+
+/**
+ * Decide whether a page is client-side rendered, i.e. its real content is absent
+ * from the static HTML. The decisive signals are an empty mount container or very
+ * little rendered text alongside several scripts; framework markers only corroborate.
+ */
+function detectCsr(html: string): { csr: boolean; signals: string[] } {
+  const signals: string[] = [];
+  for (const m of CSR_MARKERS) {
+    if (html.includes(m)) signals.push(`marker:${m}`);
+  }
+  const gen = html.match(/<meta[^>]+name=["']generator["'][^>]+content=["']([^"']+)["']/i)?.[1];
+  if (gen && /(next\.js|nuxt|gatsby|docusaurus|vitepress|astro|remix|svelte)/i.test(gen)) {
+    signals.push(`generator:${gen.trim()}`);
+  }
+
+  let emptyRoot = false;
+  let lowText = false;
+  try {
+    const doc = new JSDOM(html).window.document;
+    const root = doc.querySelector('#root, #app, #__next, [data-reactroot]');
+    emptyRoot = root != null && (root.textContent ?? '').trim().length < 50;
+    if (emptyRoot) signals.push('empty-mount-container');
+    const bodyText = (doc.body?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    const scripts = doc.querySelectorAll('script[src]').length;
+    if (bodyText.length < 400 && scripts >= 3) {
+      lowText = true;
+      signals.push(`low-text(${bodyText.length}chars)/scripts(${scripts})`);
+    }
+  } catch { /* malformed HTML — fall back to marker-only signals */ }
+
+  // Decisive: content is actually missing from the HTML. Markers alone (e.g. a Next.js
+  // SSG page that DOES embed its content) must not trip this — they'd be false positives.
+  return { csr: emptyRoot || lowText, signals };
+}
+
+/** Look for a pre-rendered markdown twin of the root page (e.g. `/page.md`, `/page/index.md`). */
+async function findMdTwin(root: string): Promise<string | null> {
+  const looksLikeMarkdown = (t: string) => /^#{1,6}\s/m.test(t) && !/<\/?(html|body|div|script)\b/i.test(t);
+  const candidates = root.endsWith('.md')
+    ? []
+    : [root + '.md', joinUrl(root + '/', 'index.md')];
+  for (const c of candidates) {
+    const text = await tryFetchText(c);
+    if (text && looksLikeMarkdown(text)) return canonicalize(c);
+  }
+  return null;
+}
+
 async function runProbe(rawUrl: string): Promise<ProbeResult> {
   if (!rawUrl) die('probe requires a URL');
   const root = canonicalize(rawUrl);
@@ -212,6 +273,8 @@ async function runProbe(rawUrl: string): Promise<ProbeResult> {
       suggestedNamespace: suggestNamespace(root),
       seedUrls: [],
       openapiSpecUrl,
+      rendering: 'ssr',
+      mdTwin: null,
       warnings,
     };
   }
@@ -229,6 +292,8 @@ async function runProbe(rawUrl: string): Promise<ProbeResult> {
       suggestedNamespace: suggestNamespace(root),
       seedUrls: parsed.urls.slice(0, 200),
       openapiSpecUrl: null,
+      rendering: 'ssr',
+      mdTwin: null,
       warnings,
     };
   }
@@ -249,6 +314,8 @@ async function runProbe(rawUrl: string): Promise<ProbeResult> {
         suggestedNamespace: suggestNamespace(root),
         seedUrls: deduped.slice(0, 200),
         openapiSpecUrl: null,
+        rendering: 'ssr',
+        mdTwin: null,
         warnings,
       };
     }
@@ -266,10 +333,28 @@ async function runProbe(rawUrl: string): Promise<ProbeResult> {
       suggestedNamespace: suggestNamespace(root),
       seedUrls: [root],
       openapiSpecUrl: null,
+      rendering: 'ssr',
+      mdTwin: null,
       warnings,
     };
   }
   const meta = extractMeta(html);
+
+  // Detect client-side rendering: if the real content isn't in the static HTML,
+  // downstream static extraction will be incomplete. Surface the route to take.
+  const { csr, signals } = detectCsr(html);
+  const rendering: 'ssr' | 'csr' = csr ? 'csr' : 'ssr';
+  let mdTwin: string | null = null;
+  if (csr) {
+    mdTwin = await findMdTwin(root);
+    warnings.push(`CSR/SPA detected (${signals.join(', ') || 'sparse static content'}); static extraction may be incomplete`);
+    warnings.push(
+      mdTwin
+        ? `pre-rendered markdown twin found: ${mdTwin} — prefer it over rendering`
+        : 'no markdown twin; use `fetch-clean --render` or operator reader-mode paste -> llms-compose',
+    );
+  }
+
   const navLinks = extractNavLinks(html, root);
   if (navLinks.length > 1) {
     return {
@@ -280,6 +365,8 @@ async function runProbe(rawUrl: string): Promise<ProbeResult> {
       suggestedNamespace: suggestNamespace(root),
       seedUrls: navLinks.slice(0, 200),
       openapiSpecUrl: null,
+      rendering,
+      mdTwin,
       warnings,
     };
   }
@@ -292,6 +379,8 @@ async function runProbe(rawUrl: string): Promise<ProbeResult> {
     suggestedNamespace: suggestNamespace(root),
     seedUrls: [root],
     openapiSpecUrl: null,
+    rendering,
+    mdTwin,
     warnings,
   };
 }
@@ -310,10 +399,89 @@ function passesSanity(md: string): { ok: boolean; reason?: string } {
   return { ok: true };
 }
 
-async function runFetchClean(rawUrl: string): Promise<void> {
+interface FetchCleanOptions {
+  render: boolean;
+  waitFor?: string;
+}
+
+function parseFetchCleanArgs(args: string[]): { url: string | undefined; options: FetchCleanOptions } {
+  let url: string | undefined;
+  const options: FetchCleanOptions = { render: false };
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === '--render') {
+      options.render = true;
+    } else if (arg === '--wait-for') {
+      const selector = args[i + 1];
+      if (!selector) die('--wait-for requires a CSS selector');
+      options.waitFor = selector;
+      i += 1;
+    } else if (arg.startsWith('--wait-for=')) {
+      options.waitFor = arg.slice('--wait-for='.length);
+    } else if (arg.startsWith('-')) {
+      die(`unknown fetch-clean option: ${arg}`);
+    } else if (!url) {
+      url = arg;
+    } else {
+      die(`unexpected fetch-clean argument: ${arg}`);
+    }
+  }
+  return { url, options };
+}
+
+async function renderMarkdown(url: string, options: FetchCleanOptions): Promise<string> {
+  let chromium: typeof import('playwright').chromium;
+  try {
+    ({ chromium } = await import('playwright'));
+  } catch (e) {
+    die(
+      [
+        'fetch-clean --render requires Playwright, but it is not installed or could not be loaded.',
+        'Install it with `pnpm install`, then install the browser with `pnpm exec playwright install chromium`.',
+        'If rendering is unavailable, use the operator paste rung with llms-compose.',
+        `Underlying error: ${e instanceof Error ? e.message : String(e)}`,
+      ].join('\n'),
+      1,
+    );
+  }
+
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ userAgent: UA });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 45_000 });
+    if (options.waitFor) {
+      await page.waitForSelector(options.waitFor, { timeout: 15_000 });
+    }
+    const html = await page.content();
+    return htmlToMarkdown(html, url);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (/Executable doesn't exist|browserType\.launch|install/i.test(message)) {
+      die(
+        [
+          'fetch-clean --render could not start Chromium.',
+          'Install it with `pnpm exec playwright install chromium`.',
+          'If rendering is unavailable, use the operator paste rung with llms-compose.',
+          `Underlying error: ${message}`,
+        ].join('\n'),
+        1,
+      );
+    }
+    die(`render failed: ${message}`, 1);
+  } finally {
+    await browser?.close().catch(() => undefined);
+  }
+  throw new Error('unreachable');
+}
+
+async function runFetchClean(args: string[]): Promise<void> {
+  const { url: rawUrl, options } = parseFetchCleanArgs(args);
   if (!rawUrl) die('fetch-clean requires a URL');
   const url = canonicalize(rawUrl);
-  const res = await fetchMarkdown(url, { userAgent: UA });
+  const res = options.render
+    ? { markdown: await renderMarkdown(url, options), error: undefined }
+    : await fetchMarkdown(url, { userAgent: UA });
   if (res.error || !res.markdown) {
     process.stderr.write(`fetch failed: ${res.error ?? 'no markdown'}\n`);
     process.exit(1);
@@ -858,7 +1026,7 @@ async function main() {
         '',
         'Commands:',
         '  probe <url>           Detect source kind + return JSON plan',
-        '  fetch-clean <url>     Fetch + clean to markdown on stdout (exit 1 on sanity failure)',
+        '  fetch-clean <url>     Fetch + clean to markdown on stdout (use --render for CSR/SPAs)',
         '  openapi <spec-url>    Parse OpenAPI/Swagger spec into JSON grouped by tag',
         '  check <namespace>     Check namespace health (or use --all, --json)',
         '  split <namespace>     Split a namespace into focused sibling namespaces',
@@ -875,7 +1043,7 @@ async function main() {
       return;
     }
     case 'fetch-clean': {
-      await runFetchClean(args[0]);
+      await runFetchClean(args);
       return;
     }
     case 'openapi': {
