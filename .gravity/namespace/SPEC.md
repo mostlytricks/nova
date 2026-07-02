@@ -67,6 +67,8 @@ A real, complete two-entry API namespace. Copy this shape:
 
 Each entry file is plain markdown (see entry rules). Manifest link path is **exactly** `/api/entries/get?name=<ns>/<file>.md` for own entries.
 
+> **Serving note:** the server also exposes every namespace under a clean per-doc prefix — `/docs/<ns>/llms.txt` and `/docs/<ns>/<file>.md` — rewriting the canonical link form above on the fly. *Authored* files keep the canonical `/api/entries/get?name=…` form; agents should be *pointed at* the `/docs/<ns>/` URL.
+
 ## Manifest Rules
 
 - **H1 = the product/API name**, not the namespace slug. `# Billing API`, not `# billing-api`.

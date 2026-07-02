@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { db, type SourceRow, type LinkRow, type SourceRefreshRow, type LinkRefreshRow } from '../db.js';
 import { probeSource, refreshSource, refreshLink } from '../fetcher/source.js';
 import { serializeLlmsTxt, type LlmsDoc } from '../parser.js';
+import { listNamespaces } from '../own.js';
+import { RESERVED_DOC_NAMES, SLUG_RE, slugify, uniqueSlug } from '../slug.js';
 import { requireWriteAccess } from '../write-protect.js';
 
 export async function registerSourcesRoutes(app: FastifyInstance): Promise<void> {
@@ -84,13 +86,14 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
         return reply.code(400).send({ error: probe.error ?? 'probe failed' });
       }
       const stmt = db.prepare(
-        `INSERT INTO sources (url, title, summary, state, ttl_hours, tags, notes, owner, trust_note, intended_use, warning)
-         VALUES (?, ?, ?, 'trial', ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO sources (url, slug, title, summary, state, ttl_hours, tags, notes, owner, trust_note, intended_use, warning)
+         VALUES (?, ?, ?, ?, 'trial', ?, ?, ?, ?, ?, ?, ?)`,
       );
       let id: number;
       try {
         const r = stmt.run(
           url,
+          newSourceSlug(probe.doc.title, url),
           probe.doc.title,
           probe.doc.summary ?? null,
           ttl_hours ?? null,
@@ -119,6 +122,7 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
       notes: string;
       ttl_hours: number | null;
       title: string;
+      slug: string;
       owner: string | null;
       trust_note: string | null;
       intended_use: string | null;
@@ -146,6 +150,16 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
     if (body.notes !== undefined) { sets.push('notes = ?'); params.push(body.notes); }
     if (body.ttl_hours !== undefined) { sets.push('ttl_hours = ?'); params.push(body.ttl_hours); }
     if (body.title !== undefined) { sets.push('title = ?'); params.push(body.title); }
+    if (body.slug !== undefined) {
+      const slug = body.slug.trim().toLowerCase();
+      if (!SLUG_RE.test(slug)) return reply.code(400).send({ error: 'invalid slug (use a-z, 0-9, -)' });
+      if (RESERVED_DOC_NAMES.has(slug)) return reply.code(400).send({ error: `'${slug}' is reserved` });
+      if (listNamespaces().includes(slug)) return reply.code(409).send({ error: `'${slug}' is taken by a local namespace` });
+      const clash = db.prepare('SELECT id FROM sources WHERE slug = ? AND id != ?').get(slug, id);
+      if (clash) return reply.code(409).send({ error: `'${slug}' is taken by another source` });
+      sets.push('slug = ?');
+      params.push(slug);
+    }
     if (body.owner !== undefined) { sets.push('owner = ?'); params.push(nullableText(body.owner)); }
     if (body.trust_note !== undefined) { sets.push('trust_note = ?'); params.push(nullableText(body.trust_note)); }
     if (body.intended_use !== undefined) { sets.push('intended_use = ?'); params.push(nullableText(body.intended_use)); }
@@ -214,10 +228,21 @@ export async function registerSourcesRoutes(app: FastifyInstance): Promise<void>
   });
 }
 
+function newSourceSlug(title: string | null | undefined, url: string): string {
+  let host = '';
+  try { host = new URL(url).host; } catch { /* keep empty */ }
+  const base = slugify(title ?? '') || slugify(host) || 'source';
+  const namespaces = new Set(listNamespaces());
+  const isTaken = (slug: string) =>
+    namespaces.has(slug) || !!db.prepare('SELECT 1 FROM sources WHERE slug = ?').get(slug);
+  return uniqueSlug(base, isTaken);
+}
+
 function formatSource(s: SourceRow) {
   return {
     id: s.id,
     url: s.url,
+    slug: s.slug,
     title: s.title,
     summary: s.summary,
     state: s.state,

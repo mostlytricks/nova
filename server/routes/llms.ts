@@ -60,6 +60,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
           title: doc.title || name,
           summary: doc.summary ?? null,
           url: `/${name}/llms.txt`,
+          docsUrl: `/docs/${name}/llms.txt`,
           meta: readNamespaceMeta(name),
         };
       }),
@@ -71,10 +72,12 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
     return {
       sources: sources.map((source) => ({
         id: source.id,
+        slug: source.slug,
         title: source.title ?? source.url,
         url: source.url,
         llmsUrl: `/agent/sources/${source.id}/llms.txt`,
         llmsLocalUrl: `/agent/sources/${source.id}/llms.txt?resolve=local`,
+        docsUrl: source.slug ? `/docs/${source.slug}/llms.txt` : null,
         tags: parseTags(source.tags),
         owner: source.owner,
         trustNote: source.trust_note,

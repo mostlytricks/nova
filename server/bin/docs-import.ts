@@ -975,7 +975,7 @@ interface ManualPlan {
   }[];
 }
 
-const RESERVED_SPLIT_SLUGS = new Set(['api', 'static', 'assets', 'llms.txt']);
+const RESERVED_SPLIT_SLUGS = new Set(['api', 'agent', 'docs', 'static', 'assets', 'llms.txt']);
 const NAMESPACE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
 function parseSplitOptions(args: string[]): { namespace: string; options: SplitOptions } {

@@ -622,6 +622,10 @@ Shipped in `server/routes/llms.ts` (`sourceDoc`/`mergedAgentDoc` take a `resolve
 
 `.claude/skills/llms-compose/SKILL.md`: added the xlsx input row and the Step 2 architecture checkpoint (steps renumbered; new hard rule "No files before the plan is confirmed").
 
+### Increment M6 — Clean per-doc URLs ("one doc, one domain") — **DONE 2026-07-02**
+
+Every doc set — local namespace or mirrored source — now lives under one clean prefix: `/docs/<name>/llms.txt` + `/docs/<name>/<file>.md` (`server/routes/docs.ts`). Local manifests are rewritten on the fly from the canonical `/api/entries/get?name=…` form (authored files unchanged — see the serving note in `namespace/SPEC.md`); mirrored sources serve cache-resolved with stable, human-readable **slugs** (new `sources.slug` column, generated at registration, backfilled on boot, PATCHable with uniqueness/reserved checks) and per-link page names derived from the link URL. Reserved names now include `agent` and `docs` (shared `server/slug.ts` set, used by namespace validation and the split CLI). `/docs` returns a JSON index of all doc sets; the agent index and `/agent/{namespaces,sources}` advertise `docsUrl`.
+
 ### Increment M3 — UC1 pilot: real external mirror
 
 Register a real external source (e.g. `https://code.claude.com/llms.txt`), let the scheduler cache manifest + links. **Acceptance test:** from a machine (or session) without internet access, an agent uses `llms-txt-reader` against `/agent/llms.txt?resolve=local` and correctly answers questions grounded in the mirrored docs. Prefer `llms-full.txt` variants when a source publishes one (link caching is one level deep by design).

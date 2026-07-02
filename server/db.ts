@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, DB_PATH, CACHE_DIR, OWN_DIR } from './config.js';
+import { slugify, uniqueSlug } from './slug.js';
 
 for (const dir of [DATA_DIR, CACHE_DIR, OWN_DIR]) {
   fs.mkdirSync(dir, { recursive: true });
@@ -113,6 +114,27 @@ ensureColumn('sources', 'intended_use', 'TEXT');
 ensureColumn('sources', 'warning', 'TEXT');
 ensureColumn('sources', 'last_reviewed_at', 'INTEGER');
 ensureColumn('sources', 'promotion_reason', 'TEXT');
+ensureColumn('sources', 'slug', 'TEXT');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_slug ON sources(slug)');
+backfillSourceSlugs();
+
+/** Give pre-slug rows a stable slug so /docs/<slug>/ URLs exist for them too. */
+function backfillSourceSlugs(): void {
+  const missing = db.prepare('SELECT id, url, title FROM sources WHERE slug IS NULL').all() as
+    { id: number; url: string; title: string | null }[];
+  if (!missing.length) return;
+  const isTaken = (slug: string) =>
+    !!db.prepare('SELECT 1 FROM sources WHERE slug = ?').get(slug);
+  const update = db.prepare('UPDATE sources SET slug = ? WHERE id = ?');
+  for (const row of missing) {
+    const base = slugify(row.title ?? '') || slugify(hostOf(row.url)) || `source-${row.id}`;
+    update.run(uniqueSlug(base, isTaken), row.id);
+  }
+}
+
+function hostOf(url: string): string {
+  try { return new URL(url).host; } catch { return ''; }
+}
 
 function ensureColumn(table: string, column: string, type: string): void {
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
@@ -125,6 +147,7 @@ export type SourceState = 'trial' | 'active' | 'archived';
 export interface SourceRow {
   id: number;
   url: string;
+  slug: string | null;
   title: string | null;
   summary: string | null;
   state: SourceState;

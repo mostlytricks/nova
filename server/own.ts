@@ -6,8 +6,10 @@ import type { NamespaceDocType } from './namespace-meta.js';
 
 const OWN_LLMS = path.join(OWN_DIR, 'llms.txt');
 
+import { RESERVED_DOC_NAMES } from './slug.js';
+
 // Names reserved at the URL root — namespaces can't shadow these.
-const RESERVED_NAMESPACES = new Set(['api', 'llms.txt', 'assets', 'static']);
+const RESERVED_NAMESPACES = RESERVED_DOC_NAMES;
 const NAMESPACE_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
 /* ---------- master llms.txt ---------- */
