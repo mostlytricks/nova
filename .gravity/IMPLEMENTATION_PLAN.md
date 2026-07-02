@@ -635,9 +635,11 @@ The UI now supports the human side of the curation loop:
 - **Lint**: `server/health.ts` gains `link_missing_description` (descriptions are required per `namespace/SPEC.md`; the checker now enforces it).
 - `remark-gfm` added so parameter/response tables render as tables in every markdown preview.
 
-### Increment M3 — UC1 pilot: real external mirror
+### Increment M3 — UC1 pilot: real external mirror — **VALIDATED 2026-07-02** (sandbox)
 
-Register a real external source (e.g. `https://code.claude.com/llms.txt`), let the scheduler cache manifest + links. **Acceptance test:** from a machine (or session) without internet access, an agent uses `llms-txt-reader` against `/agent/llms.txt?resolve=local` and correctly answers questions grounded in the mirrored docs. Prefer `llms-full.txt` variants when a source publishes one (link caching is one level deep by design).
+Piloted with `https://code.claude.com/llms.txt`: registered (slug `claude-code-docs`), promoted, refreshed — **163/163 sub-linked pages cached, 0 errors**. `/docs/claude-code-docs/llms.txt` rewrites all 163 links to clean local URLs; a consumer-style lookup (hooks → `PreToolUse`) answered from the cache alone; the reader renders the mirror like a doc site. Note: pages carry upstream MDX tags (`<Steps>`, `<Tabs>`) that the normalizer keeps — cosmetic in the reader, harmless to agents.
+
+Remaining for the real deployment: repeat on the intranet host (if the server needs an egress proxy, run Node with `NODE_USE_ENV_PROXY=1` + `NODE_EXTRA_CA_CERTS=<ca-bundle>` — Node's `fetch` ignores `HTTPS_PROXY` by default) and run the offline acceptance test from a second machine with `llms-txt-reader`. Prefer `llms-full.txt` variants when a source publishes one (link caching is one level deep by design).
 
 ### Increment M4 — UC2 pilot: first real internal manual
 

@@ -21,7 +21,8 @@ Last touched: 2026-07-02
 - `.gravity/IMPLEMENTATION_PLAN.md`: **Track M** (M3 UC1 mirror pilot → M4 UC2 manual pilot → M5 governance) is the active arc; Phase 8 (Search) queued behind it.
 
 ## Next Step
-- **Track M3 — UC1 pilot:** register a real external `llms.txt` (e.g. code.claude.com), let it cache, then run the offline acceptance test against `/agent/llms.txt?resolve=local` with `llms-txt-reader`.
+- **Track M3 residual:** repeat the (sandbox-validated) code.claude.com mirror on the real intranet host + offline acceptance test from a second machine (`NODE_USE_ENV_PROXY=1` + `NODE_EXTRA_CA_CERTS` if egress goes through a proxy).
+- **Track M4 — UC2 pilot:** compose the first real internal manual (pptx/excel) through the new `llms-compose` checkpoint flow; fresh-agent acceptance test.
 
 ---
 
