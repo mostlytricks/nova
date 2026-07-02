@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api } from '../api';
+import { ReviewPanel } from './ReviewPanel';
 
 interface ReaderLink {
   title: string;
@@ -26,15 +27,19 @@ interface ReaderManifest {
 export function ReaderView({
   doc,
   onBack,
+  onChanged,
 }: {
   doc: string;
   onBack: () => void;
+  onChanged?: () => void;
 }) {
   const [manifest, setManifest] = useState<ReaderManifest | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pageUrl, setPageUrl] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isNamespace, setIsNamespace] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   const pages = useMemo(
     () => (manifest ? manifest.sections.flatMap((s) => s.links).filter((l) => isInternal(l.url)) : []),
@@ -55,6 +60,12 @@ export function ReaderView({
         if (first) setPageUrl(first.url);
       })
       .catch((e) => setErr(String(e)));
+    setIsNamespace(false);
+    setShowReview(false);
+    api
+      .getNamespaceMeta(doc)
+      .then(() => setIsNamespace(true))
+      .catch(() => setIsNamespace(false));
   }, [doc]);
 
   useEffect(() => {
@@ -82,6 +93,11 @@ export function ReaderView({
       <div className="toolbar">
         <h1>{manifest?.title ?? doc}</h1>
         <span className="meta">reader · /docs/{doc}/</span>
+        {isNamespace && (
+          <button className={showReview ? 'primary' : ''} onClick={() => setShowReview((v) => !v)}>
+            Review
+          </button>
+        )}
         <a href={`/docs/${doc}/llms.txt`} target="_blank" rel="noreferrer">
           <button>Raw</button>
         </a>
@@ -92,7 +108,7 @@ export function ReaderView({
       )}
       {err && <div className="error">{err}</div>}
       {manifest && (
-        <div className="reader">
+        <div className={`reader ${showReview ? 'reader-review-open' : ''}`}>
           <nav className="reader-toc">
             {manifest.sections.map((section) => (
               <div key={section.name}>
@@ -137,6 +153,7 @@ export function ReaderView({
               </div>
             )}
           </div>
+          {showReview && <ReviewPanel namespace={doc} onChanged={onChanged} />}
         </div>
       )}
     </div>

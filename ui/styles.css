@@ -362,6 +362,76 @@ input:focus, textarea:focus { outline: none; border-color: #3b82f6; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.reader-review-open {
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(280px, 340px);
+}
+
+/* Review panel + lint strip */
+.review-panel {
+  overflow-y: auto;
+  background: #12151c;
+  border: 1px solid #1f2430;
+  border-radius: 6px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+.review-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.review-panel-title { font-weight: 600; color: #fff; flex: 1; }
+.review-issues {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.review-issue {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: #0f1115;
+  border: 1px solid #1f2430;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.review-issue .history-pill { margin-top: 1px; flex-shrink: 0; }
+.review-issue-text { color: #c5c8cf; overflow-wrap: anywhere; }
+.review-issue-path { color: #7c8493; }
+.review-clean { color: #4ade80; }
+.review-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #c5c8cf;
+  border-top: 1px solid #1f2430;
+  padding-top: 10px;
+}
+.review-meta .k { color: #7c8493; }
+.review-warning { color: #fbbf24; }
+.review-actions { display: flex; gap: 8px; margin-top: 2px; }
+.lint-strip {
+  background: #12151c;
+  border: 1px solid #1f2430;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.lint-strip summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+.lint-strip summary::-webkit-details-marker { display: none; }
+.lint-strip .review-issues { margin-top: 10px; }
 
 /* Dashboard */
 .section-title {

@@ -626,6 +626,15 @@ Shipped in `server/routes/llms.ts` (`sourceDoc`/`mergedAgentDoc` take a `resolve
 
 Every doc set — local namespace or mirrored source — now lives under one clean prefix: `/docs/<name>/llms.txt` + `/docs/<name>/<file>.md` (`server/routes/docs.ts`). Local manifests are rewritten on the fly from the canonical `/api/entries/get?name=…` form (authored files unchanged — see the serving note in `namespace/SPEC.md`); mirrored sources serve cache-resolved with stable, human-readable **slugs** (new `sources.slug` column, generated at registration, backfilled on boot, PATCHable with uniqueness/reserved checks) and per-link page names derived from the link URL. Reserved names now include `agent` and `docs` (shared `server/slug.ts` set, used by namespace validation and the split CLI). `/docs` returns a JSON index of all doc sets; the agent index and `/agent/{namespaces,sources}` advertise `docsUrl`.
 
+### Increment M7 — Human review UI: reader + review panel + lint — **DONE 2026-07-02**
+
+The UI now supports the human side of the curation loop:
+
+- **Reader mode** (`ui/components/ReaderView.tsx`): read-only doc-site view over any `/docs/<name>/` prefix — manifest as TOC, rendered entry, prev/next — for local namespaces *and* active mirrored sources. In-content links to served docs navigate inside the reader.
+- **Review panel** (`ui/components/ReviewPanel.tsx`): health-checker issues + trust metadata + "Mark reviewed" / "Promote to active" actions, as a toggleable third column in the reader and a collapsible lint strip above the manifest editor.
+- **Lint**: `server/health.ts` gains `link_missing_description` (descriptions are required per `namespace/SPEC.md`; the checker now enforces it).
+- `remark-gfm` added so parameter/response tables render as tables in every markdown preview.
+
 ### Increment M3 — UC1 pilot: real external mirror
 
 Register a real external source (e.g. `https://code.claude.com/llms.txt`), let the scheduler cache manifest + links. **Acceptance test:** from a machine (or session) without internet access, an agent uses `llms-txt-reader` against `/agent/llms.txt?resolve=local` and correctly answers questions grounded in the mirrored docs. Prefer `llms-full.txt` variants when a source publishes one (link caching is one level deep by design).

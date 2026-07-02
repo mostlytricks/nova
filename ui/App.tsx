@@ -123,6 +123,7 @@ export function App() {
         {selection.kind === 'reader' && (
           <ReaderView
             doc={selection.doc}
+            onChanged={reload}
             onBack={() => {
               if (namespaces.some((namespace) => namespace.name === selection.doc)) {
                 setSelection({ kind: 'namespace-llms', namespace: selection.doc });

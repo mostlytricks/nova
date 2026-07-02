@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, type ManagedDocState, type NamespaceHistoryEvent, type NamespaceMeta } from '../api';
 import type { Selection } from '../App';
+import { ReviewPanel } from './ReviewPanel';
 
 type Props =
   | { kind: 'own' }
@@ -128,6 +129,9 @@ export function LlmsTxtView(props: Props) {
         </div>
       )}
       {err && <div className="error" style={{ marginBottom: 8 }}>{err}</div>}
+      {props.kind === 'namespace' && tab === 'llms' && (
+        <ReviewPanel namespace={props.namespace} compact onChanged={props.onReload} />
+      )}
       {(props.kind === 'own' || tab === 'llms') && (
         <div className="editor">
           <textarea
