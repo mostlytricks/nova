@@ -14,6 +14,7 @@ export default defineConfig({
     proxy: {
       '/api/': 'http://localhost:3000',
       '/agent/': 'http://localhost:3000',
+      '/docs': 'http://localhost:3000',
       '/llms.txt': 'http://localhost:3000',
       '^/[^/]+/llms\\.txt$': 'http://localhost:3000',
     },

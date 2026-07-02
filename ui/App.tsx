@@ -7,6 +7,7 @@ import { SourceView } from './components/SourceView';
 import { ProbeDialog } from './components/ProbeDialog';
 import { Dashboard } from './components/Dashboard';
 import { AgentView } from './components/AgentView';
+import { ReaderView } from './components/ReaderView';
 
 export type Selection =
   | { kind: 'dashboard' }
@@ -14,7 +15,8 @@ export type Selection =
   | { kind: 'own-llms' }
   | { kind: 'namespace-llms'; namespace: string }
   | { kind: 'own-entry'; name: string }
-  | { kind: 'source'; id: number };
+  | { kind: 'source'; id: number }
+  | { kind: 'reader'; doc: string };
 
 export interface Namespace {
   name: string;
@@ -113,8 +115,22 @@ export function App() {
         {selection.kind === 'source' && (
           <SourceView
             id={selection.id}
+            onSelect={setSelection}
             onChanged={reload}
             onDeleted={() => { setSelection({ kind: 'own-llms' }); reload(); }}
+          />
+        )}
+        {selection.kind === 'reader' && (
+          <ReaderView
+            doc={selection.doc}
+            onBack={() => {
+              if (namespaces.some((namespace) => namespace.name === selection.doc)) {
+                setSelection({ kind: 'namespace-llms', namespace: selection.doc });
+                return;
+              }
+              const source = sources.find((s) => s.slug === selection.doc);
+              setSelection(source ? { kind: 'source', id: source.id } : { kind: 'dashboard' });
+            }}
           />
         )}
       </div>

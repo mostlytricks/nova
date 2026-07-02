@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api } from '../api';
 import type { Selection } from '../App';
 
@@ -67,7 +68,7 @@ export function EntryView({
           spellCheck={false}
         />
         <div className="preview">
-          <Markdown components={markdownLinkComponents(onSelect)}>{content}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownLinkComponents(onSelect)}>{content}</Markdown>
         </div>
       </div>
     </div>
