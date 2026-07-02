@@ -18,6 +18,8 @@ interface AgentExternalSourceLink {
   url: string;
   llmsUrl: string;
   absoluteLlmsUrl: string;
+  llmsLocalUrl: string;
+  absoluteLlmsLocalUrl: string;
   owner: string | null;
   trustNote: string | null;
   intendedUse: string | null;
@@ -109,12 +111,15 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
       splitIndexes,
       activeSources: activeSources.map((source): AgentExternalSourceLink => {
         const llmsUrl = `/agent/sources/${source.id}/llms.txt`;
+        const llmsLocalUrl = `${llmsUrl}?resolve=local`;
         return {
           id: source.id,
           title: source.title ?? source.url,
           url: source.url,
           llmsUrl,
           absoluteLlmsUrl: absoluteUrl(origin, llmsUrl),
+          llmsLocalUrl,
+          absoluteLlmsLocalUrl: absoluteUrl(origin, llmsLocalUrl),
           owner: source.owner,
           trustNote: source.trust_note,
           intendedUse: source.intended_use,
@@ -187,6 +192,10 @@ function buildSnippets(
     snippets.push({
       title: 'Include imported docs',
       text: `Use ${absoluteUrl(origin, agentUrl)} when the task needs approved active imported docs merged with local docs.`,
+    });
+    snippets.push({
+      title: 'Intranet / offline',
+      text: `Use ${absoluteUrl(origin, `${agentUrl}?resolve=local`)} when agents cannot reach the internet: cached external links are rewritten to this server's local cache.`,
     });
   }
   return snippets;

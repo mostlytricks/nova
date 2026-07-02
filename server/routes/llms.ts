@@ -38,7 +38,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
       return readOwnRaw();
     }
 
-    const merged = mergedAgentDoc(tag);
+    const merged = mergedAgentDoc(tag, wantsLocalResolve(req));
     reply.header('content-type', 'text/markdown; charset=utf-8');
     return serializeLlmsTxt(merged);
   });
@@ -48,7 +48,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/agent/llms.txt', async (req, reply) => {
     const tag = (req.query as any)?.tag as string | undefined;
     reply.header('content-type', 'text/markdown; charset=utf-8');
-    return serializeLlmsTxt(mergedAgentDoc(tag));
+    return serializeLlmsTxt(mergedAgentDoc(tag, wantsLocalResolve(req)));
   });
 
   app.get('/agent/namespaces', async () => {
@@ -74,6 +74,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
         title: source.title ?? source.url,
         url: source.url,
         llmsUrl: `/agent/sources/${source.id}/llms.txt`,
+        llmsLocalUrl: `/agent/sources/${source.id}/llms.txt?resolve=local`,
         tags: parseTags(source.tags),
         owner: source.owner,
         trustNote: source.trust_note,
@@ -94,7 +95,7 @@ export async function registerLlmsRoutes(app: FastifyInstance): Promise<void> {
     if (!source) return reply.code(404).send({ error: 'active source not found' });
 
     reply.header('content-type', 'text/markdown; charset=utf-8');
-    return serializeLlmsTxt(sourceDoc(source));
+    return serializeLlmsTxt(sourceDoc(source, wantsLocalResolve(req)));
   });
 
   /* -------- namespace llms.txt (public, agent-facing) -------- */
@@ -272,18 +273,25 @@ function existsOnDisk(): boolean {
   return fs.existsSync(path.join(OWN_DIR, 'llms.txt'));
 }
 
-function mergedAgentDoc(tag?: string): LlmsDoc {
+function mergedAgentDoc(tag?: string, resolveLocal = false): LlmsDoc {
   const sourceDocs = activeSources()
     .filter((source) => !tag || parseTags(source.tags).includes(tag))
-    .map((source) => ({ title: source.title ?? source.url, doc: sourceDoc(source) }));
+    .map((source) => ({ title: source.title ?? source.url, doc: sourceDoc(source, resolveLocal) }));
   return mergeOwnWithSources(readOwnLlms(), sourceDocs);
+}
+
+// ?resolve=local rewrites cached external links to the local cache endpoint so
+// intranet agents without internet access can follow the manifest. Links not
+// yet cached keep their upstream URL.
+function wantsLocalResolve(req: { query?: unknown }): boolean {
+  return (req.query as any)?.resolve === 'local';
 }
 
 function activeSources(): SourceRow[] {
   return db.prepare(`SELECT * FROM sources WHERE state = 'active' ORDER BY created_at`).all() as SourceRow[];
 }
 
-function sourceDoc(source: SourceRow): LlmsDoc {
+function sourceDoc(source: SourceRow, resolveLocal = false): LlmsDoc {
   const links = db.prepare('SELECT * FROM links WHERE source_id = ? ORDER BY position').all(source.id) as LinkRow[];
   const sectionMap = new Map<string, LinkRow[]>();
   for (const link of links) {
@@ -298,7 +306,7 @@ function sourceDoc(source: SourceRow): LlmsDoc {
       name,
       links: sectionLinks.map((link) => ({
         title: link.title ?? link.url,
-        url: link.url,
+        url: resolveLocal && link.cache_hash ? `/api/links/${link.id}/content` : link.url,
         description: link.description ?? undefined,
       })),
     })),

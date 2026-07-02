@@ -1,8 +1,9 @@
 # CONTEXT — local-llmstxt-server
 
-Last touched: 2026-06-21
+Last touched: 2026-07-02
 
 ## Completed
+- **Track M kicked off: intranet mirror + manual-ingestion strategy** (2026-07-02, on branch `claude/agent-guide-feasibility-u116jt`). Feasibility review confirmed the two target use cases (mirror external `llms.txt` on the intranet; compose internal pptx/excel manuals into namespaces) map onto the existing lanes, with one real gap: served manifests emitted upstream external URLs, making the cache invisible to offline agents. Shipped **`?resolve=local`** (`/agent/llms.txt`, `/agent/sources/:id/llms.txt`, `/llms.txt?merge=true` rewrite cached links to `/api/links/:id/content`; agent index advertises it). Upgraded `llms-compose`: xlsx input row + a **mandatory Step 2 architecture checkpoint** (analyze → present plan → discuss → confirm → only then write). Strategy recorded as **Track M** (M1–M5) in `.gravity/IMPLEMENTATION_PLAN.md`.
 - **Docs moved to `.gravity/` (doc-system adoption)** (2026-06-21, **uncommitted**). Relocated the heavy docs out of the repo root into `.gravity/`, grouped by domain: top-level `MISSION.html` / `ARCHITECTURE.html` / `IMPLEMENTATION_PLAN.md`, plus `ingest/SPEC.md` (was `SPEC.ingest-router.md`) and `namespace/SPEC.md` (was `SPEC.dev-docs-llms-txt.md`). `CLAUDE.md` + `CONTEXT.md` + `README.md` stay at root; `CLAUDE.md` is now the **router** (Doc Map + read-first table + domain gate). `MISSION.html` gained a §05 "two domains" section; `IMPLEMENTATION_PLAN.md` gained a per-domain status spine. All skill/doc cross-refs repathed. Per workspace CLAUDE.md §6 — see the `CLAUDE.md` Doc Map.
 - **Ingestion router + CSR/SPA handling — Track R complete locally** (2026-06-20, **uncommitted**). `probe` now returns `rendering: 'ssr'|'csr'` + `mdTwin` (pre-rendered markdown twin): `detectCsr` flags client-side rendering from empty mount container / low-text+scripts (markers only corroborate, so SSG with embedded content is not a false positive), and `findMdTwin` discovers `/page.md` shortcuts. Added `SPEC.ingest-router.md` (the input→lane front door + 3-rung SPA ladder: twin → render → operator paste) and wired both skills to it. Added opt-in `pnpm docs-import fetch-clean <url> --render` with lazy Playwright Chromium, optional `--wait-for <selector>`, shared `htmlToMarkdown(html, url)`, and graceful missing-dep/browser guidance. Proved `llms-compose` by composing the local Track R specs into `data/own/ingestion-router/`; `pnpm docs-import check ingestion-router` reports healthy. Verified: `pnpm typecheck` clean; live probe of `fastify.dev` stays `ssr`; a local SPA-shell server correctly reports `csr` + finds/omits the twin with the right fallback warning; local CSR render smoke test produced cleaned markdown from the rendered DOM.
 - **Authoring contract + composer skill** (2026-06-20, **uncommitted — in working tree**). Wrote `SPEC.dev-docs-llms-txt.md` (repo root) — the agent-loadable requirements + quality gate for *dev/API* `llms.txt` namespaces (manifest/entry rules, dev-API specifics like base-URL/auth-once, the required-metadata gap list, "don't invent — ask"). Added `.claude/skills/llms-compose/SKILL.md` — composes a namespace from *arbitrary local material the agent reads itself* (pptx/clipboard/PDF/text/local files) via a batched metadata interview; defers to the SPEC on all rules. Dry-run completed against local Track R specs.
@@ -12,17 +13,18 @@ Last touched: 2026-06-21
 
 ## Current State
 - Runs locally via `pnpm dev` (UI 5173, API 3000). `pnpm typecheck` passes clean (server + UI). No tests.
-- Git: **8 commits on `master`, even with `origin/master`**. Working tree is uncommitted: the Track R + agent-endpoint code (`server/bin/docs-import.ts`, `server/fetcher/fetch.ts`, `package.json`, `pnpm-lock.yaml`, `README.md`), the `llms-compose` skill + `docs-import` skill edits, and the new **`.gravity/` doc reorg** (docs moved out of root via `git mv`; SPECs now at `.gravity/{ingest,namespace}/SPEC.md`).
-- CSR/SPA strategy decided = **ladder** (twin → headless render → operator paste). Track R implementation is complete locally and ready to commit.
-- `.gravity/IMPLEMENTATION_PLAN.md` Phase 8 (Search) is still the unstarted roadmap arc and becomes the next implementation target after committing the current Track R + endpoint alignment slice.
+- Git: Track R + `.gravity/` reorg are **committed** (`master` head `fc009d9`, pushed). The Track M1/M2 slice lives on branch `claude/agent-guide-feasibility-u116jt`.
+- CSR/SPA strategy = **ladder** (twin → headless render → operator paste), shipped. `llms-compose` now enforces an architecture-checkpoint-before-writing flow and accepts xlsx.
+- `?resolve=local` makes cached external docs servable to offline intranet agents.
+- `.gravity/IMPLEMENTATION_PLAN.md`: **Track M** (M3 UC1 mirror pilot → M4 UC2 manual pilot → M5 governance) is the active arc; Phase 8 (Search) queued behind it.
 
 ## Next Step
-- Commit the whole ingestion-router + agent endpoint alignment slice, then start **Phase 8 — Search**.
+- **Track M3 — UC1 pilot:** register a real external `llms.txt` (e.g. code.claude.com), let it cache, then run the offline acceptance test against `/agent/llms.txt?resolve=local` with `llms-txt-reader`.
 
 ---
 
 <!-- Notes:
 - No formatter/linter configured — don't introduce one without asking.
 - Default branch is `master`, not `main`.
-- `llms-compose` is DRAFT until dry-run on a real deck/page.
+- `llms-compose` passed its local dry-run; first *real* deck/excel run is Track M4.
 -->

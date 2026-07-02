@@ -9,7 +9,7 @@ The phase roadmap below tracks the *control-plane build*; this table tracks the 
 
 | Domain | | Where it stands · next |
 |---|---|---|
-| `ingest` | ◑ | Front-door router + CSR/SPA ladder (Track R) complete locally, **pending commit**. Contract: `ingest/SPEC.md`. Next: commit Track R; fold login/CA fourth-path note into the ladder. |
+| `ingest` | ◑ | Front-door router + CSR/SPA ladder (Track R) **committed** (`fc009d9`). Contract: `ingest/SPEC.md`. Next: Track M pilots (real external mirror + real internal-manual compose); fold login/CA fourth-path note into the ladder. |
 | `namespace` | ✓ | Output contract stable and enforced by `pnpm docs-import check`. Contract: `namespace/SPEC.md`. Next: revisit only as dev/API requirements evolve. |
 
 ## Mission Fit
@@ -569,13 +569,13 @@ Inputs grew beyond clean URLs. Two failure modes had to be closed: (1) arbitrary
 - [x] **CSR/SPA = a 3-rung ladder, graceful degradation** (chosen over CLI-only render or paste-only): `mdTwin` shortcut → headless render → operator reader-mode paste. Prefer the cheapest lossless rung.
 - [x] **`llms-compose` produces no new output shape** — same `data/own/<ns>/` namespace; only the reader differs. It centers on a metadata interview that fills the gaps raw material leaves (base URL, auth, summary, provenance) — **asks, never invents**.
 
-### Increment 1 — Router + CSR detection + md-twin shortcut — **DONE 2026-06-20** (uncommitted)
+### Increment 1 — Router + CSR detection + md-twin shortcut — **DONE 2026-06-20** (committed 2026-06-21)
 
 Shipped: `probe` (in `server/bin/docs-import.ts`) returns `rendering: 'ssr' | 'csr'` and `mdTwin: string | null`. `detectCsr()` flags client-side rendering from an empty mount container or low rendered-text + multiple scripts (framework markers only corroborate, so SSG-with-content is not a false positive). `findMdTwin()` discovers `/page.md` shortcuts. Authored `namespace/SPEC.md` (output contract + quality gate), `ingest/SPEC.md` (front door + ladder), and the `llms-compose` skill (DRAFT); wired the `docs-import` skill to check `rendering` first.
 
 Verified: `pnpm typecheck` clean; live `fastify.dev` stays `ssr`; a local SPA-shell server reports `csr`, finds the twin when present and emits the paste-fallback warning when absent.
 
-### Increment 2 — Headless render rung (opt-in dep) — **DONE 2026-06-20** (uncommitted)
+### Increment 2 — Headless render rung (opt-in dep) — **DONE 2026-06-20** (committed 2026-06-21)
 
 The middle rung: only reached when `rendering=csr` AND no `mdTwin`.
 
@@ -583,9 +583,9 @@ Shipped: `pnpm docs-import fetch-clean <url> --render` lazy-imports Playwright C
 
 Verification: `pnpm typecheck`; `fetch-clean <real-CSR-doc-page> --render` yields non-junk markdown that passes `passesSanity`; the missing-dep path prints actionable guidance and exits non-zero.
 
-### Increment 3 — Prove + drop DRAFT + commit — **DONE 2026-06-20** (uncommitted)
+### Increment 3 — Prove + drop DRAFT + commit — **DONE 2026-06-21** (committed `fc009d9`)
 
-Dry-run completed with the local Track R spec files as real local material. `llms-compose` produced `data/own/ingestion-router/`, and `pnpm docs-import check ingestion-router` reports healthy with 3 links, 3 entries, and 0 warnings. Removed the `DRAFT.` marker from `.claude/skills/llms-compose/SKILL.md`. Remaining action: commit the whole slice together.
+Dry-run completed with the local Track R spec files as real local material. `llms-compose` produced `data/own/ingestion-router/`, and `pnpm docs-import check ingestion-router` reports healthy with 3 links, 3 entries, and 0 warnings. Removed the `DRAFT.` marker from `.claude/skills/llms-compose/SKILL.md`. Slice committed and pushed.
 
 ### Touchpoints
 
@@ -596,6 +596,47 @@ Dry-run completed with the local Track R spec files as real local material. `llm
 | `ingest/SPEC.md` | Front door + ladder (done). Canonical for routing. |
 | `namespace/SPEC.md` | Output contract + quality gate (done). Canonical for "what good looks like". |
 | `.claude/skills/{docs-import,llms-compose}/SKILL.md` | Procedures; both link the router (done; drop `llms-compose` DRAFT in Inc 3). |
+
+---
+
+## Track M — Intranet Mirror & Internal-Manual Strategy
+
+> The deployment track: turn the built control plane into the thing it was for. Two use cases, one purpose — **pay the pptx/excel/image parsing cost once, serve clean markdown to every agent on the intranet.**
+>
+> - **UC1 — external mirror:** register external `llms.txt` sources (e.g. `code.claude.com/llms.txt`), cache manifest + sub-linked docs, serve them on the intranet.
+> - **UC2 — internal manuals:** compose internal work-process / API / system manuals (pptx, excel, images) into `llms.txt` namespaces via `llms-compose`, review, serve.
+
+### Locked decisions
+
+- [x] **Cache-resolved serving for intranet agents.** Served manifests emitted upstream external URLs, so agents without internet could not use the cache. `?resolve=local` on `/agent/llms.txt`, `/agent/sources/:id/llms.txt`, and `/llms.txt?merge=true` rewrites cached links to `/api/links/:id/content`; uncached links keep their upstream URL.
+- [x] **`llms-compose` gains a mandatory architecture checkpoint.** After analyzing the material, the agent presents the plan (inventory, profile, entry files, sections, gaps) and the operator discusses/confirms **before any file is written**. Confirmed 2026-07-02 as the preferred process.
+- [x] **Excel is a first-class compose input** (per-sheet dump → markdown tables); it was missing from the skill's input table despite being the highest-fidelity manual format.
+- [x] **Prioritize manuals by re-parse frequency.** Conversion value = (parse cost per query) × (queries per week); convert the most-consulted material first.
+- [x] **Human review stays the accuracy gate.** `check` validates structure, not truth; composed namespaces stay `draft` until reviewed. Re-compose on manual change is a manual, reviewed event — do not automate.
+
+### Increment M1 — Cache-resolved serving (`?resolve=local`) — **DONE 2026-07-02**
+
+Shipped in `server/routes/llms.ts` (`sourceDoc`/`mergedAgentDoc` take a `resolveLocal` flag; `wantsLocalResolve` reads the query param) and `server/routes/agent.ts` (`/api/agent/index` advertises `llmsLocalUrl` per source plus an "Intranet / offline" snippet; `/agent/sources` returns `llmsLocalUrl`).
+
+### Increment M2 — Compose-skill upgrades — **DONE 2026-07-02**
+
+`.claude/skills/llms-compose/SKILL.md`: added the xlsx input row and the Step 2 architecture checkpoint (steps renumbered; new hard rule "No files before the plan is confirmed").
+
+### Increment M3 — UC1 pilot: real external mirror
+
+Register a real external source (e.g. `https://code.claude.com/llms.txt`), let the scheduler cache manifest + links. **Acceptance test:** from a machine (or session) without internet access, an agent uses `llms-txt-reader` against `/agent/llms.txt?resolve=local` and correctly answers questions grounded in the mirrored docs. Prefer `llms-full.txt` variants when a source publishes one (link caching is one level deep by design).
+
+### Increment M4 — UC2 pilot: first real internal manual
+
+Pick the internal manual set agents currently re-parse most often (ideally a pptx + excel pair). Prepare interview answers up front (base URL, auth, version, audience, known gaps), run `llms-compose` through the new checkpoint flow, pass `pnpm docs-import check`. **Acceptance test:** a fresh agent session answers 3–5 real task questions from the served namespace alone. Failures point at the entry/description to fix.
+
+### Increment M5 — Scale with governance
+
+Before wide intranet exposure: set `WRITE_TOKEN`; establish namespace naming/tag conventions per team or system; assign an owner + review cadence per namespace (`.meta.json` trust fields exist since Phase 5); keep everything `draft` until reviewed. Curation quality over volume — ten reviewed namespaces beat fifty raw dumps.
+
+### When Phase 8 (Search) triggers
+
+Manifest-based selection works to a few dozen namespaces. When agents start picking the wrong namespace from the index alone, start Phase 8.
 
 ---
 
@@ -624,9 +665,10 @@ For each phase:
 
 ## Immediate Next Step
 
-Two open threads — **Track R runs ahead of Phase 8**:
+Track R is committed. **Track M is the active thread** and runs ahead of Phase 8:
 
-1. **Track R commit** (active) — commit the completed ingestion-router slice.
-2. **Phase 8 — Search** (queued) — a fast read-only search endpoint over own content, namespaces, and cached source metadata.
+1. **Track M3 — UC1 pilot** (active) — register a real external `llms.txt`, verify the `?resolve=local` mirror with the offline acceptance test.
+2. **Track M4 — UC2 pilot** (next) — compose the first real internal manual (pptx/excel) through the new checkpoint flow; fresh-agent acceptance test.
+3. **Phase 8 — Search** (queued) — starts when namespace selection from the manifest alone stops scaling.
 
-A fresh agent picking up here should commit Track R, then begin Phase 8 Search. Read the Phase 8 section and inspect the existing routes before editing.
+A fresh agent picking up here should read Track M, run M3, then M4. Read the Phase 8 section and inspect the existing routes before starting Search.
