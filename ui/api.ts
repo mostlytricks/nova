@@ -1,6 +1,7 @@
 export interface Source {
   id: number;
   url: string;
+  slug: string | null;
   title: string | null;
   summary: string | null;
   state: 'trial' | 'active' | 'archived';
@@ -223,6 +224,8 @@ export const api = {
     json<{ ok: true }>(`/api/links/${id}/refresh`, { method: 'POST' }),
   linkContent: (id: number) =>
     fetch(`/api/links/${id}/content`).then((r) => (r.ok ? r.text() : Promise.reject(r.statusText))),
+  docsText: (path: string) =>
+    fetch(path).then((r) => (r.ok ? r.text() : Promise.reject(`${r.status}: ${r.statusText}`))),
   getLinkHistory: (id: number) =>
     json<{ link: Link; refreshes: LinkRefreshRecord[] }>(`/api/links/${encodeURIComponent(id)}/history`),
   listEntries: () => json<{ entries: string[] }>('/api/entries'),

@@ -14,10 +14,15 @@ interface AgentIndexLink {
 
 interface AgentExternalSourceLink {
   id: number;
+  slug: string | null;
   title: string;
   url: string;
   llmsUrl: string;
   absoluteLlmsUrl: string;
+  llmsLocalUrl: string;
+  absoluteLlmsLocalUrl: string;
+  docsUrl: string | null;
+  absoluteDocsUrl: string | null;
   owner: string | null;
   trustNote: string | null;
   intendedUse: string | null;
@@ -32,6 +37,8 @@ interface AgentNamespaceLink extends AgentIndexLink {
   name: string;
   title: string;
   summary: string | null;
+  docsUrl: string;
+  absoluteDocsUrl: string;
   health: NamespaceHealthReport['status'];
   links: number;
   isSplit: boolean;
@@ -47,6 +54,7 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
       const doc = readNamespaceLlms(name);
       const health = healthByName.get(name);
       const url = `/${name}/llms.txt`;
+      const docsUrl = `/docs/${name}/llms.txt`;
       const sourceNamespace = splitSourceNamespace(name);
       return {
         name,
@@ -55,6 +63,8 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
         label: doc.title || name,
         url,
         absoluteUrl: absoluteUrl(origin, url),
+        docsUrl,
+        absoluteDocsUrl: absoluteUrl(origin, docsUrl),
         health: health?.status ?? 'error',
         links: health?.stats.links ?? doc.sections.reduce((acc, section) => acc + section.links.length, 0),
         isSplit: name.includes('--'),
@@ -109,12 +119,19 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
       splitIndexes,
       activeSources: activeSources.map((source): AgentExternalSourceLink => {
         const llmsUrl = `/agent/sources/${source.id}/llms.txt`;
+        const llmsLocalUrl = `${llmsUrl}?resolve=local`;
+        const docsUrl = source.slug ? `/docs/${source.slug}/llms.txt` : null;
         return {
           id: source.id,
+          slug: source.slug,
           title: source.title ?? source.url,
           url: source.url,
           llmsUrl,
           absoluteLlmsUrl: absoluteUrl(origin, llmsUrl),
+          llmsLocalUrl,
+          absoluteLlmsLocalUrl: absoluteUrl(origin, llmsLocalUrl),
+          docsUrl,
+          absoluteDocsUrl: docsUrl ? absoluteUrl(origin, docsUrl) : null,
           owner: source.owner,
           trustNote: source.trust_note,
           intendedUse: source.intended_use,
@@ -174,7 +191,7 @@ function buildSnippets(
   if (startHere) {
     snippets.push({
       title: 'Use this local doc',
-      text: `Use ${startHere.absoluteUrl} for ${startHere.title}. Prefer its linked entries over broad web search.`,
+      text: `Use ${startHere.absoluteDocsUrl} for ${startHere.title}. Everything for this doc set lives under that /docs/ prefix. Prefer its linked entries over broad web search.`,
     });
   }
   if (splitIndex) {
@@ -187,6 +204,10 @@ function buildSnippets(
     snippets.push({
       title: 'Include imported docs',
       text: `Use ${absoluteUrl(origin, agentUrl)} when the task needs approved active imported docs merged with local docs.`,
+    });
+    snippets.push({
+      title: 'Intranet / offline',
+      text: `Use ${absoluteUrl(origin, `${agentUrl}?resolve=local`)} when agents cannot reach the internet: cached external links are rewritten to this server's local cache.`,
     });
   }
   return snippets;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api, type Source } from '../api';
 
 export function ProbeDialog({
@@ -76,7 +77,7 @@ export function ProbeDialog({
               {preview.doc.sections.reduce((n: number, s: any) => n + s.links.length, 0)} link(s)
             </div>
             <div className="preview-scroll">
-              <Markdown>{preview.raw}</Markdown>
+              <Markdown remarkPlugins={[remarkGfm]}>{preview.raw}</Markdown>
             </div>
           </>
         )}

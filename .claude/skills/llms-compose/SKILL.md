@@ -35,6 +35,7 @@ Identify each input and read it. You ARE allowed to parse here (unlike `docs-imp
 | Input | How to read it |
 |---|---|
 | **pptx** | `python -c "from pptx import Presentation; ..."` to dump slide text + tables. If `python-pptx` is missing, tell the operator `pip install python-pptx`. Read speaker notes too — API details often hide there. |
+| **xlsx / Excel** | Dump per sheet with `openpyxl` (or pandas) and convert to markdown tables. If missing, tell the operator `pip install openpyxl`. Watch for merged cells and multi-row headers — verify each table reads correctly before using it; ask the operator when a sheet's structure is ambiguous. Often the best source material: parameter lists and code tables convert near-losslessly. |
 | **PDF** | Use the `Read` tool (it renders PDF pages). |
 | **Pasted text** | The operator pastes directly, OR pull the clipboard yourself on Windows: `powershell -NoProfile -Command Get-Clipboard`. Confirm you captured it all before proceeding. |
 | **Local `.md` / `.txt` / code** | `Read` them directly. |
@@ -44,7 +45,7 @@ If material spans several inputs, gather them all before drafting — grouping d
 
 ## Step 1 — Extract, don't invent
 
-Pull out the real substance: endpoints, parameters, auth, base URLs, concepts, examples. Keep a running list of `{ title, content, kind }`. Note what's **present** and — critically — what's **absent** (no base URL on the slides? no auth section? no examples?). The gaps drive Step 2.
+Pull out the real substance: endpoints, parameters, auth, base URLs, concepts, examples. Keep a running list of `{ title, content, kind }`. Note what's **present** and — critically — what's **absent** (no base URL on the slides? no auth section? no examples?). The gaps drive Steps 2–3.
 
 Preserve the source's wording. Do not smooth, translate, or add preambles (SPEC: Entry File Rules).
 
@@ -57,7 +58,19 @@ Also classify the Local Docs profile from `.gravity/namespace/SPEC.md`:
 
 If the material is both website and API, propose either one combined namespace only when they are a single product surface, or two sibling namespaces when agents would consume them separately.
 
-## Step 2 — The metadata interview (the heart of this skill)
+## Step 2 — Propose the doc architecture (mandatory checkpoint)
+
+After analyzing the material and **before writing any file**, present a plan to the operator and get it confirmed. Show, in one message:
+
+- **Material inventory** — what you read (each input, roughly what it contains) and what you could NOT extract (diagrams, screenshots, ambiguous tables).
+- **Proposed profile + namespace slug** — `api` / `website` / `library` / `notes`, and the `<ns>` name.
+- **Proposed entry files** — the file list with one line each on what goes in it (e.g. `auth.md — Bearer scheme from slide 12`, `invoices.md — endpoints from sheet "API목록"`).
+- **Proposed manifest sections** — the `##` grouping and which entries land in each.
+- **Gaps found** — fields the material doesn't supply (these become the Step 3 interview).
+
+Then **discuss and adjust** — the operator may merge/split entries, rename the namespace, change the profile, or drop material. Iterate on the plan until the operator confirms it. You may batch the Step 3 metadata questions into the same message, but **do not write anything under `data/own/` until the plan is confirmed.** If the operator explicitly waives the checkpoint ("just go"), still show the plan, then proceed with it.
+
+## Step 3 — The metadata interview (the heart of this skill)
 
 Raw material rarely supplies everything a good dev/API `llms.txt` needs. Walk the **Required Metadata** table in `.gravity/namespace/SPEC.md`, mark which fields the material already answers, and **ask the operator for the rest in one batched set of questions** — don't drip one at a time, and don't guess.
 
@@ -73,13 +86,13 @@ Always confirm or ask for:
 8. **Version / environment** — API version, product release, package version, prod/staging/internal environment.
 9. **Intended use / audience / warnings** — ask. This feeds trust metadata (SPEC + MISSION §03 human-curated trust).
 10. **Known gaps** — facts missing from source/operator that agents must not invent.
-11. **Section grouping** — propose your grouping (by resource/tag for APIs, workflow/concept/navigation for websites); confirm before writing.
+11. **Section grouping** — already proposed and confirmed at the Step 2 checkpoint; re-confirm only if the interview answers change the plan.
 
 **Rule: a missing field is a question, never an invention.** A plausible-but-wrong base URL or example payload makes a downstream agent confidently wrong — the one failure this skill exists to prevent.
 
-If the operator says "just go," fill only what the material truly supports, leave genuinely-unknown fields out (don't fabricate), and flag the omissions in your Step 5 report.
+If the operator says "just go," fill only what the material truly supports, leave genuinely-unknown fields out (don't fabricate), and flag the omissions in your Step 7 report.
 
-## Step 3 — Draft entries
+## Step 4 — Draft entries
 
 Follow `.gravity/namespace/SPEC.md` (Entry File Rules + Dev/API-Specific Requirements):
 
@@ -90,7 +103,7 @@ Follow `.gravity/namespace/SPEC.md` (Entry File Rules + Dev/API-Specific Require
 - **For APIs:** one `auth.md`; per-endpoint `## `\`<METHOD> <path>\`` sections with a Parameters table; request/response examples **only if the source gave them**.
 - Each entry starts with a `# ` heading matching its manifest title. Language hints on code blocks.
 
-## Step 4 — Write manifest + entries
+## Step 5 — Write manifest + entries
 
 Write each `data/own/<namespace>/<topic>.md`, then `data/own/<namespace>/llms.txt` using the manifest template in `.gravity/namespace/SPEC.md` (Minimal Shape). Every link line gets a description. Own-entry link path is literally `/api/entries/get?name=<namespace>/<file>.md`. Use today's real date.
 
@@ -120,7 +133,7 @@ Write `data/own/<namespace>/.meta.json`:
 
 Fill only confirmed/source-backed values. Use `null` for unknown fields and describe important gaps in `known_gaps`.
 
-## Step 5 — Quality gate
+## Step 6 — Quality gate
 
 Run the project's checker — it enforces most of the SPEC:
 
@@ -132,7 +145,7 @@ Treat anything other than `healthy` as a failing gate: fix it or report it expli
 
 Also verify `.meta.json`: correct `doc_type`, `state: "draft"` for new composed docs, source/provenance fields captured, and unknowns not hidden.
 
-## Step 6 — Report back
+## Step 7 — Report back
 
 ```
 Composed <namespace> from <inputs, e.g. "Billing API deck (pptx) + pasted auth notes">
@@ -149,6 +162,7 @@ Then offer the follow-ups: register it as a tracked source / set trust metadata 
 ## Hard rules
 
 - **Read `.gravity/namespace/SPEC.md` first; it wins on any conflict with this skill.**
+- **No files before the plan is confirmed.** The Step 2 architecture checkpoint is mandatory — analysis first, then a shown-and-agreed plan, then writing.
 - **Don't invent content — ask.** Missing field → question to the operator, never a fabricated value.
 - **Originals are immutable.** Composing never edits a source namespace; emit into a fresh `data/own/<namespace>/`. If `<namespace>` exists, ask: replace or merge.
 - **Don't normalize voice or translate.** You're a composer, not a copywriter.

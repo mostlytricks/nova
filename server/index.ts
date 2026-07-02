@@ -10,6 +10,7 @@ import { registerContentRoutes } from './routes/content.js';
 import { registerStatsRoutes } from './routes/stats.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerAgentRoutes } from './routes/agent.js';
+import { registerDocsRoutes } from './routes/docs.js';
 import { startScheduler } from './fetcher/scheduler.js';
 
 const app = Fastify({ logger: true });
@@ -21,6 +22,7 @@ await registerContentRoutes(app);
 await registerStatsRoutes(app);
 await registerHealthRoutes(app);
 await registerAgentRoutes(app);
+await registerDocsRoutes(app);
 
 if (fs.existsSync(UI_DIST)) {
   await app.register(fastifyStatic, { root: UI_DIST, prefix: '/' });

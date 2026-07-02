@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api, type Link, type LinkRefreshRecord, type Source, type SourceRefreshRecord } from '../api';
+import type { Selection } from '../App';
 
 export function SourceView({
   id,
+  onSelect,
   onChanged,
   onDeleted,
 }: {
   id: number;
+  onSelect?: (selection: Selection) => void;
   onChanged: () => void;
   onDeleted: () => void;
 }) {
@@ -107,6 +111,9 @@ export function SourceView({
       <div className="toolbar">
         <h1>{source.title || source.url}</h1>
         <span className={`tag`}>{source.state}</span>
+        {source.state === 'active' && source.slug && onSelect && (
+          <button onClick={() => onSelect({ kind: 'reader', doc: source.slug! })}>Reader</button>
+        )}
         <a href={sourceLlmsUrl} target="_blank" rel="noreferrer">
           <button disabled={source.state !== 'active'}>Raw</button>
         </a>
@@ -262,7 +269,7 @@ export function SourceView({
               </div>
             )}
             {!sourceLlms && !sourceLlmsErr && <div className="meta">Loading imported llms.txt...</div>}
-            {sourceLlms && <Markdown>{sourceLlms}</Markdown>}
+            {sourceLlms && <Markdown remarkPlugins={[remarkGfm]}>{sourceLlms}</Markdown>}
           </div>
         </div>
       )}
@@ -310,7 +317,7 @@ export function SourceView({
                     Refresh
                   </button>
                 </div>
-                <Markdown>{content}</Markdown>
+                <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
               </>
             )}
           </div>

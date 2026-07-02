@@ -54,9 +54,13 @@ Point an agent / tool at **one of these URLs**:
 | URL | What it returns |
 |---|---|
 | `GET /agent/llms.txt` | **Recommended agent entrypoint.** Local master plus active trusted imported docs. |
+| `GET /agent/llms.txt?resolve=local` | Same, but cached external links are rewritten to this server's local cache (`/api/links/:id/content`). Use when agents cannot reach the internet — the intranet mirror mode. Links not yet cached keep their upstream URL. |
+| `GET /docs` | JSON index of every doc set (local + mirrored) with its `/docs/` URL. |
+| `GET /docs/<name>/llms.txt` | **One doc, one domain.** Everything for a doc set under one clean prefix. For a local namespace, entry links are rewritten to `/docs/<name>/<file>.md`; for a mirrored source (by its slug), cached pages are served as `/docs/<slug>/<page>.md` and uncached links keep their upstream URL. |
+| `GET /docs/<name>/<file>.md` | An entry (local) or cached page (mirrored) inside that doc set's prefix. |
 | `GET /agent/namespaces` | JSON catalog of local docs and their manifest URLs. |
 | `GET /agent/sources` | JSON catalog of active imported docs and their source-specific manifest URLs. |
-| `GET /agent/sources/:id/llms.txt` | One active imported doc set as a focused manifest, e.g. only ADK or only LangChain. |
+| `GET /agent/sources/:id/llms.txt` | One active imported doc set as a focused manifest, e.g. only ADK or only LangChain. Also supports `?resolve=local`. |
 | `GET /llms.txt` | **Your master llms.txt.** The top-level index — typically links to each local doc set's llms.txt. |
 | `GET /llms.txt?merge=true` | Legacy merged view: master, plus one section per **active** imported doc set. Prefer `/agent/llms.txt`. |
 | `GET /llms.txt?merge=true&tag=agents` | Same, but only imported docs tagged `agents`. |
@@ -197,10 +201,13 @@ None. Designed for trusted internal networks. Don't expose this directly to the 
 
 | Method | Path | Body | Purpose |
 |---|---|---|---|
-| GET | `/agent/llms.txt` | — | recommended agent manifest |
+| GET | `/agent/llms.txt` | — | recommended agent manifest (`?resolve=local` = intranet mirror view) |
 | GET | `/agent/namespaces` | — | local docs catalog |
 | GET | `/agent/sources` | — | active imported docs catalog |
-| GET | `/agent/sources/:id/llms.txt` | — | one active imported doc manifest |
+| GET | `/agent/sources/:id/llms.txt` | — | one active imported doc manifest (`?resolve=local` supported) |
+| GET | `/docs` | — | JSON index of all doc sets and their `/docs/` URLs |
+| GET | `/docs/:name/llms.txt` | — | one doc set's manifest under its clean prefix (namespace or source slug) |
+| GET | `/docs/:name/:file.md` | — | entry / cached page inside that prefix |
 | GET | `/llms.txt` | — | master llms.txt |
 | GET | `/llms.txt?merge=true[&tag=…]` | — | legacy master + imported docs |
 | GET | `/:namespace/llms.txt` | — | one local doc set's llms.txt |

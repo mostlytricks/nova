@@ -192,6 +192,13 @@ function warnOnManifestShape(
   for (const [url, count] of seen.entries()) {
     if (count > 1) issues.push(warning('duplicate_link_url', `duplicate link URL appears ${count} times: ${url}`, `${namespace}/llms.txt`));
   }
+
+  // Descriptions are how agents select without fetching — required by namespace/SPEC.md.
+  for (const link of links) {
+    if (!link.description?.trim()) {
+      issues.push(warning('link_missing_description', `link has no description: ${link.title || link.url}`, `${namespace}/llms.txt`));
+    }
+  }
 }
 
 function checkEntryFiles(

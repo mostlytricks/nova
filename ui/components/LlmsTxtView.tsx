@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api, type ManagedDocState, type NamespaceHistoryEvent, type NamespaceMeta } from '../api';
 import type { Selection } from '../App';
+import { ReviewPanel } from './ReviewPanel';
 
 type Props =
   | { kind: 'own' }
@@ -88,6 +90,11 @@ export function LlmsTxtView(props: Props) {
       <div className="toolbar">
         <h1>{title}</h1>
         <span className="meta">{dirty ? 'unsaved' : 'saved'}</span>
+        {props.kind === 'namespace' && (
+          <button onClick={() => props.onSelect({ kind: 'reader', doc: props.namespace })}>
+            Reader
+          </button>
+        )}
         <a href={rawUrl} target="_blank" rel="noreferrer">
           <button>Raw</button>
         </a>
@@ -122,6 +129,9 @@ export function LlmsTxtView(props: Props) {
         </div>
       )}
       {err && <div className="error" style={{ marginBottom: 8 }}>{err}</div>}
+      {props.kind === 'namespace' && tab === 'llms' && (
+        <ReviewPanel namespace={props.namespace} compact onChanged={props.onReload} />
+      )}
       {(props.kind === 'own' || tab === 'llms') && (
         <div className="editor">
           <textarea
@@ -130,7 +140,7 @@ export function LlmsTxtView(props: Props) {
             spellCheck={false}
           />
           <div className="preview">
-            <Markdown components={props.kind === 'namespace' ? markdownLinkComponents(props.onSelect) : undefined}>
+            <Markdown remarkPlugins={[remarkGfm]} components={props.kind === 'namespace' ? markdownLinkComponents(props.onSelect) : undefined}>
               {raw}
             </Markdown>
           </div>
@@ -485,7 +495,7 @@ function NamespaceEntries({
           )}
           {contentErr && <div className="error">{contentErr}</div>}
           {selected && !content && !contentErr && <div className="meta">Loading page...</div>}
-          {content && <Markdown components={markdownLinkComponents(onSelect)}>{content}</Markdown>}
+          {content && <Markdown remarkPlugins={[remarkGfm]} components={markdownLinkComponents(onSelect)}>{content}</Markdown>}
         </div>
       </div>
     </div>
