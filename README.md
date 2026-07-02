@@ -189,6 +189,18 @@ powershell.exe -Command "Stop-Process -Id <PID> -Force"
 
 **Add-source fails with "Not a valid llms.txt"** — the URL didn't return parseable llms.txt content. The probe response includes the raw body; check whether the site actually publishes one.
 
+**Add-source / refresh fails with a network error, but `curl <url>` works** — you're behind an egress proxy. Node's built-in `fetch` (used to probe and cache external sources) ignores `HTTPS_PROXY`/`HTTP_PROXY` by default, so the server can't reach the internet even though your shell can. Start the server with proxy support enabled:
+
+```bash
+# route Node's fetch through the proxy, and trust its CA if it does TLS interception
+NODE_USE_ENV_PROXY=1 \
+NODE_EXTRA_CA_CERTS=/path/to/corp-ca-bundle.crt \
+HTTPS_PROXY=http://proxy.corp.internal:8080 \
+pnpm start
+```
+
+`NODE_USE_ENV_PROXY=1` requires Node 22+ (this project's floor). Drop `NODE_EXTRA_CA_CERTS` if your proxy doesn't re-sign TLS. This only affects fetching *external* sources — local docs and the UI work regardless.
+
 ---
 
 ## Auth
