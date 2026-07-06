@@ -9,6 +9,7 @@
  *   openapi <spec-url>      Parse an OpenAPI/Swagger spec into structured JSON grouped by tag
  *   check <namespace>       Check namespace health
  *   split <namespace>       Split a namespace into focused sibling namespaces
+ *   search <query>          Search local docs + cached external docs (metadata + content)
  *
  * Output goes to stdout in the command-specific format. Errors go to stderr;
  * exit codes are 0 (ok), 1 (failed sanity / not found), 2 (bad usage).
@@ -1307,6 +1308,47 @@ async function runSplit(args: string[]): Promise<void> {
 
 /* ---------- entry point ---------- */
 
+/* ---------- search ---------- */
+
+async function runSearch(args: string[]): Promise<void> {
+  let json = false;
+  let limit: number | undefined;
+  const words: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--json') json = true;
+    else if (arg === '--limit') {
+      const n = Number(args[++i]);
+      if (!Number.isFinite(n) || n < 1) die('--limit requires a positive number');
+      limit = Math.min(100, Math.floor(n));
+    } else words.push(arg);
+  }
+  const query = words.join(' ').trim();
+  if (!query) die('search requires a query');
+
+  // Lazy import so unrelated commands (probe/check/split) don't open the DB.
+  const { search } = await import('../search.js');
+  const results = search(query, { limit });
+
+  if (json) {
+    process.stdout.write(JSON.stringify({ query, count: results.length, results }, null, 2) + '\n');
+    return;
+  }
+
+  if (!results.length) {
+    process.stdout.write(`No results for "${query}".\n`);
+    return;
+  }
+  const lines = [`${results.length} result${results.length === 1 ? '' : 's'} for "${query}"`, ''];
+  for (const r of results) {
+    lines.push(`[${r.kind}] ${r.title} — ${r.scope}`);
+    lines.push(`  ${r.url}`);
+    if (r.snippet) lines.push(`  ${r.snippet}`);
+    lines.push('');
+  }
+  process.stdout.write(lines.join('\n'));
+}
+
 async function main() {
   const [, , cmd, ...args] = process.argv;
   if (!cmd || cmd === '-h' || cmd === '--help') {
@@ -1321,6 +1363,7 @@ async function main() {
         '  openapi <spec-url>    Parse OpenAPI/Swagger spec into JSON grouped by tag',
         '  check <namespace>     Check namespace health (or use --all, --json)',
         '  split <namespace>     Split a namespace into focused sibling namespaces',
+        '  search <query>        Search local docs + cached external docs (use --json, --limit N)',
         '',
       ].join('\n'),
     );
@@ -1353,6 +1396,10 @@ async function main() {
     }
     case 'split': {
       await runSplit(args);
+      return;
+    }
+    case 'search': {
+      await runSearch(args);
       return;
     }
     default:

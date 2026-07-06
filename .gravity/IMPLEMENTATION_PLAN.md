@@ -532,26 +532,42 @@ The code uses route-local guards instead of a single global `onRequest` hook. Th
 
 ## Phase 8 — Search
 
+Status: **implemented 2026-07-06** (re-built; an earlier uncommitted implementation was lost in a git pull). Shared core `server/search.ts`, route `server/routes/search.ts`, CLI `docs-import search`.
+
 ### Goal
 
 Help humans and agents find the right namespace or entry before fetching too much.
 
 ### First Version
 
-- Search `data/own/**/*.md`.
-- Search namespace manifests.
-- Search cached external markdown metadata.
-- Return title, namespace/source, snippet, and URL.
+- Search `data/own/**/*.md`. **Done.**
+- Search namespace manifests. **Done.**
+- Search cached external markdown metadata (+ cached body of active sources). **Done.**
+- Return title, namespace/source, snippet, and URL. **Done.**
 
 ### Route Shape
 
 ```http
-GET /api/search?q=<query>
+GET /api/search?q=<query>&limit=<n>
 ```
+
+Also `pnpm docs-import search <query> [--json] [--limit N]` (same corpus + ranking via `server/search.ts`, mirroring how `health.ts` feeds both route and CLI).
+
+### Design notes
+
+- Ranking is simple on purpose: case-insensitive **AND-term** substring matching with per-field weights (title > description/summary > body). No FTS yet.
+- Result URLs are servable `/docs/<name>/…` links; source-page URLs reuse `routes/docs.ts`'s `sourcePageNames` so they match what `/docs/` serves (no 404 drift). Nested own entries fall back to the canonical `/api/entries/get?name=…` URL.
+
+### Verification (2026-07-06)
+
+- `pnpm typecheck` clean (server + UI).
+- CLI: `docs-import search router` / `"vue component"` / `--json` return ranked namespace, entry, and cached-source results; empty query and no-match handled.
+- API: `GET /api/search?q=router` returns results; `?q=` and a no-match query return `{count:0}`.
+- Contract: the top result URL served **200** with real content (`/docs/agent-development-kit-adk/index-41.md`).
 
 ### Later
 
-Consider SQLite FTS if simple search is too slow. Do not add heavy search infrastructure until the basic behavior proves useful.
+Consider SQLite FTS if simple search is too slow. Do not add heavy search infrastructure until the basic behavior proves useful. Not yet surfaced in the UI or `llms-txt-reader` — API + CLI only.
 
 ---
 
@@ -666,7 +682,7 @@ Agents should work in this order unless the user explicitly redirects:
 5. Phase 5 trust metadata. **Done.**
 6. Phase 6 refresh history. **Done.**
 7. Phase 7 write protection. **Done.**
-8. Phase 8 search.
+8. Phase 8 search. **Done** (API + CLI; not yet in the UI / `llms-txt-reader`).
 
 For each phase:
 
