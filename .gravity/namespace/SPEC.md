@@ -6,6 +6,8 @@ This is the compact, agent-loadable rule sheet for producing `data/own/<ns>/` do
 
 Verified by hand today (no linter yet): run `pnpm docs-import check <ns>` after writing — it enforces most rules below (valid manifest, resolvable links, size/stub bounds, HTML leak, orphans). Treat a non-`healthy` result as a failing gate.
 
+**Gate:** `pnpm docs-import check <ns>` — a non-`healthy` result fails; enforces manifest validity, resolvable links, size/stub bounds, HTML-leak and orphan checks. Rules it can't check (profile fit, "don't invent — ask", auth-once) are `[review]` judgment.
+
 ---
 
 ## Core Definition

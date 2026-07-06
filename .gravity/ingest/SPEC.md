@@ -4,6 +4,8 @@ Canonical references: `../namespace/SPEC.md` (what a good output is), and the `d
 
 The output contract is always the same — a namespace under `data/own/<ns>/` that satisfies `../namespace/SPEC.md`. Only the *ingestion path* differs.
 
+**Gate:** `pnpm typecheck` (the probe/router is code) + manually re-run `pnpm docs-import probe <url>` on one SSR and one CSR page to confirm the `rendering` verdict routes to the right lane. Whether the *right* lane was chosen for a given input is `[review]` judgment.
+
 ## The two lanes
 
 - **`docs-import`** — input is a **URL** the project CLI can fetch and parse. The CLI does the fetching/parsing; the agent makes editorial calls.

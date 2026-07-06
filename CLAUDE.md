@@ -3,6 +3,8 @@
 Internal-network server that hosts your own `llms.txt` (with namespaced sub-manifests) and acts as a probe/cache/relay for external `llms.txt` sources. React UI for editing own content, probing new external sources, and managing source lifecycle (trial → active → archived).
 
 > **alias:** `nova` — *Namespace Orchestrator for Verified Agent-docs*; the project's declared short name, resolved by gravity tooling (`.claude/scripts/resolve_project.py`). Owned here, per project.
+>
+> **gravity: v1.0** · This project uses the workspace `.gravity/` doc system. `CLAUDE.md` is the root router, `CONTEXT.md` owns now, and `.gravity/` owns the durable why / what-next / how-it-is-built docs.
 
 ---
 
