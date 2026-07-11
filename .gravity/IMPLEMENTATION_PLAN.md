@@ -9,8 +9,17 @@ The phase roadmap below tracks the *control-plane build*; this table tracks the 
 
 | Domain | | Where it stands · next |
 |---|---|---|
-| `ingest` | ◑ | Front-door router + CSR/SPA ladder (Track R) **committed** (`fc009d9`). Contract: `ingest/SPEC.md`. Next: Track M pilots (real external mirror + real internal-manual compose); fold login/CA fourth-path note into the ladder. |
+| `ingest` | ◑ | Router + CSR/SPA ladder shipped (Track R retired → `ingest/SPEC.md`). Now carrying **Track M** (intranet deployment) via `PLAN.intranet-mirror.md`. Next: M3 on the real host, then M4. |
 | `namespace` | ✓ | Output contract stable and enforced by `pnpm docs-import check`. Contract: `namespace/SPEC.md`. Next: revisit only as dev/API requirements evolve. |
+
+## Tracks (the direction axis)
+
+The spine above says *where each domain is*; a **track** says *how far along each cross-domain intent is*. A track holds no slices itself — it is an index into the domain `PLAN.*.md` slices carrying it, and points up to the MISSION principle it serves. A track retires when its residue is walls (its rules live on as enforcement-tagged SPEC rules).
+
+| Track | Direction (→ `MISSION.html` §) | Carried by | Status |
+|---|---|---|---|
+| **M — intranet deployment** | Pay the pptx/excel/image parse cost once; serve clean markdown to every intranet agent (→ §01 Mission) | `.gravity/ingest/PLAN.intranet-mirror.md` | ◑ active |
+| **R — input hardening** | Any input (URL · CSR/SPA · pptx/xlsx/paste) → a namespace that satisfies the output contract (→ §03 Product Principles) | residue → `ingest/SPEC.md` + `namespace/SPEC.md` | ✓ retired |
 
 ## Mission Fit
 
@@ -571,99 +580,17 @@ Consider SQLite FTS if simple search is too slow. Do not add heavy search infras
 
 ---
 
-## Track R — Ingestion Router & CSR/SPA Handling
+## Track R — input hardening — ✓ RETIRED
 
-> A parallel track (not one of the numbered phases) that runs **ahead of Phase 8**. It hardens the *input side* of the control plane: turning any input — URL, swagger, pptx, PDF, pasted text, or a horrible client-side-rendered SPA — into a namespace that satisfies `namespace/SPEC.md`. Read `ingest/SPEC.md` and `namespace/SPEC.md` before touching this.
+Track R hardened the *input side*: any input (URL · swagger · CSR/SPA · pptx/PDF/paste) becomes a namespace that satisfies the output contract, via two ingestion lanes (`docs-import` URL lane · `llms-compose` local lane) and the 3-rung CSR/SPA ladder (md-twin shortcut → headless render → operator paste). Shipped and committed (`fc009d9`).
 
-### Why
+**Residue = walls.** The direction's rules now live as enforcement in `ingest/SPEC.md` (front door + ladder) and `namespace/SPEC.md` (output contract + quality gate) — so the track retires per the direction pipeline (MISSION §06). Full increment history (probe CSR/twin detection, `fetch-clean --render`, the dry-run proof) is in git.
 
-Inputs grew beyond clean URLs. Two failure modes had to be closed: (1) arbitrary local material (pptx/paste/PDF) had no ingestion path, and (2) **CSR/SPA pages** returned an empty shell from static fetch, failing *silently*. Both `docs-import`'s `fetch-clean` and a plain web fetch are static-HTML only — neither runs JS.
+## Track M — intranet deployment — ◑ ACTIVE
 
-### Locked decisions
+The deployment direction: turn the built control plane into the thing it was for — **pay the pptx/excel/image parse cost once, serve clean markdown to every intranet agent.** Two use cases: UC1 external mirror (cache approved `llms.txt` sources, serve cache-resolved) · UC2 internal manuals (compose pptx/excel via `llms-compose`, review, serve).
 
-- [x] **Two ingestion lanes, one output contract.** `docs-import` (URL → CLI fetch/parse) and `llms-compose` (local material → agent reads it). Both must satisfy `namespace/SPEC.md`. Front door = `ingest/SPEC.md`.
-- [x] **CSR/SPA = a 3-rung ladder, graceful degradation** (chosen over CLI-only render or paste-only): `mdTwin` shortcut → headless render → operator reader-mode paste. Prefer the cheapest lossless rung.
-- [x] **`llms-compose` produces no new output shape** — same `data/own/<ns>/` namespace; only the reader differs. It centers on a metadata interview that fills the gaps raw material leaves (base URL, auth, summary, provenance) — **asks, never invents**.
-
-### Increment 1 — Router + CSR detection + md-twin shortcut — **DONE 2026-06-20** (committed 2026-06-21)
-
-Shipped: `probe` (in `server/bin/docs-import.ts`) returns `rendering: 'ssr' | 'csr'` and `mdTwin: string | null`. `detectCsr()` flags client-side rendering from an empty mount container or low rendered-text + multiple scripts (framework markers only corroborate, so SSG-with-content is not a false positive). `findMdTwin()` discovers `/page.md` shortcuts. Authored `namespace/SPEC.md` (output contract + quality gate), `ingest/SPEC.md` (front door + ladder), and the `llms-compose` skill (DRAFT); wired the `docs-import` skill to check `rendering` first.
-
-Verified: `pnpm typecheck` clean; live `fastify.dev` stays `ssr`; a local SPA-shell server reports `csr`, finds the twin when present and emits the paste-fallback warning when absent.
-
-### Increment 2 — Headless render rung (opt-in dep) — **DONE 2026-06-20** (committed 2026-06-21)
-
-The middle rung: only reached when `rendering=csr` AND no `mdTwin`.
-
-Shipped: `pnpm docs-import fetch-clean <url> --render` lazy-imports Playwright Chromium, loads the page with `waitUntil: 'networkidle'`, optionally waits for `--wait-for <selector>`, then passes the rendered DOM through the shared `htmlToMarkdown(html, url)` Readability/Turndown pipeline. Playwright is declared as a dev dependency and loaded only for `--render`; the README documents `pnpm exec playwright install chromium`. Missing package/browser paths exit non-zero with install guidance and point operators to the paste rung.
-
-Verification: `pnpm typecheck`; `fetch-clean <real-CSR-doc-page> --render` yields non-junk markdown that passes `passesSanity`; the missing-dep path prints actionable guidance and exits non-zero.
-
-### Increment 3 — Prove + drop DRAFT + commit — **DONE 2026-06-21** (committed `fc009d9`)
-
-Dry-run completed with the local Track R spec files as real local material. `llms-compose` produced `data/own/ingestion-router/`, and `pnpm docs-import check ingestion-router` reports healthy with 3 links, 3 entries, and 0 warnings. Removed the `DRAFT.` marker from `.claude/skills/llms-compose/SKILL.md`. Slice committed and pushed.
-
-### Touchpoints
-
-| File | Work |
-|---|---|
-| `server/bin/docs-import.ts` | `probe` CSR/twin fields (done); `fetch-clean --render` (done). |
-| `server/fetcher/fetch.ts` | Expose `htmlToMarkdown(html, url)` for the render path (done). |
-| `ingest/SPEC.md` | Front door + ladder (done). Canonical for routing. |
-| `namespace/SPEC.md` | Output contract + quality gate (done). Canonical for "what good looks like". |
-| `.claude/skills/{docs-import,llms-compose}/SKILL.md` | Procedures; both link the router (done; drop `llms-compose` DRAFT in Inc 3). |
-
----
-
-## Track M — Intranet Mirror & Internal-Manual Strategy
-
-> The deployment track: turn the built control plane into the thing it was for. Two use cases, one purpose — **pay the pptx/excel/image parsing cost once, serve clean markdown to every agent on the intranet.**
->
-> - **UC1 — external mirror:** register external `llms.txt` sources (e.g. `code.claude.com/llms.txt`), cache manifest + sub-linked docs, serve them on the intranet.
-> - **UC2 — internal manuals:** compose internal work-process / API / system manuals (pptx, excel, images) into `llms.txt` namespaces via `llms-compose`, review, serve.
-
-### Locked decisions
-
-- [x] **Cache-resolved serving for intranet agents.** Served manifests emitted upstream external URLs, so agents without internet could not use the cache. `?resolve=local` on `/agent/llms.txt`, `/agent/sources/:id/llms.txt`, and `/llms.txt?merge=true` rewrites cached links to `/api/links/:id/content`; uncached links keep their upstream URL.
-- [x] **`llms-compose` gains a mandatory architecture checkpoint.** After analyzing the material, the agent presents the plan (inventory, profile, entry files, sections, gaps) and the operator discusses/confirms **before any file is written**. Confirmed 2026-07-02 as the preferred process.
-- [x] **Excel is a first-class compose input** (per-sheet dump → markdown tables); it was missing from the skill's input table despite being the highest-fidelity manual format.
-- [x] **Prioritize manuals by re-parse frequency.** Conversion value = (parse cost per query) × (queries per week); convert the most-consulted material first.
-- [x] **Human review stays the accuracy gate.** `check` validates structure, not truth; composed namespaces stay `draft` until reviewed. Re-compose on manual change is a manual, reviewed event — do not automate.
-
-### Increment M1 — Cache-resolved serving (`?resolve=local`) — **DONE 2026-07-02**
-
-Shipped in `server/routes/llms.ts` (`sourceDoc`/`mergedAgentDoc` take a `resolveLocal` flag; `wantsLocalResolve` reads the query param) and `server/routes/agent.ts` (`/api/agent/index` advertises `llmsLocalUrl` per source plus an "Intranet / offline" snippet; `/agent/sources` returns `llmsLocalUrl`).
-
-### Increment M2 — Compose-skill upgrades — **DONE 2026-07-02**
-
-`.claude/skills/llms-compose/SKILL.md`: added the xlsx input row and the Step 2 architecture checkpoint (steps renumbered; new hard rule "No files before the plan is confirmed").
-
-### Increment M6 — Clean per-doc URLs ("one doc, one domain") — **DONE 2026-07-02**
-
-Every doc set — local namespace or mirrored source — now lives under one clean prefix: `/docs/<name>/llms.txt` + `/docs/<name>/<file>.md` (`server/routes/docs.ts`). Local manifests are rewritten on the fly from the canonical `/api/entries/get?name=…` form (authored files unchanged — see the serving note in `namespace/SPEC.md`); mirrored sources serve cache-resolved with stable, human-readable **slugs** (new `sources.slug` column, generated at registration, backfilled on boot, PATCHable with uniqueness/reserved checks) and per-link page names derived from the link URL. Reserved names now include `agent` and `docs` (shared `server/slug.ts` set, used by namespace validation and the split CLI). `/docs` returns a JSON index of all doc sets; the agent index and `/agent/{namespaces,sources}` advertise `docsUrl`.
-
-### Increment M7 — Human review UI: reader + review panel + lint — **DONE 2026-07-02**
-
-The UI now supports the human side of the curation loop:
-
-- **Reader mode** (`ui/components/ReaderView.tsx`): read-only doc-site view over any `/docs/<name>/` prefix — manifest as TOC, rendered entry, prev/next — for local namespaces *and* active mirrored sources. In-content links to served docs navigate inside the reader.
-- **Review panel** (`ui/components/ReviewPanel.tsx`): health-checker issues + trust metadata + "Mark reviewed" / "Promote to active" actions, as a toggleable third column in the reader and a collapsible lint strip above the manifest editor.
-- **Lint**: `server/health.ts` gains `link_missing_description` (descriptions are required per `namespace/SPEC.md`; the checker now enforces it).
-- `remark-gfm` added so parameter/response tables render as tables in every markdown preview.
-
-### Increment M3 — UC1 pilot: real external mirror — **VALIDATED 2026-07-02** (sandbox)
-
-Piloted with `https://code.claude.com/llms.txt`: registered (slug `claude-code-docs`), promoted, refreshed — **163/163 sub-linked pages cached, 0 errors**. `/docs/claude-code-docs/llms.txt` rewrites all 163 links to clean local URLs; a consumer-style lookup (hooks → `PreToolUse`) answered from the cache alone; the reader renders the mirror like a doc site. Note: pages carry upstream MDX tags (`<Steps>`, `<Tabs>`) that the normalizer keeps — cosmetic in the reader, harmless to agents.
-
-Remaining for the real deployment: repeat on the intranet host (if the server needs an egress proxy, run Node with `NODE_USE_ENV_PROXY=1` + `NODE_EXTRA_CA_CERTS=<ca-bundle>` — Node's `fetch` ignores `HTTPS_PROXY` by default) and run the offline acceptance test from a second machine with `llms-txt-reader`. Prefer `llms-full.txt` variants when a source publishes one (link caching is one level deep by design).
-
-### Increment M4 — UC2 pilot: first real internal manual
-
-Pick the internal manual set agents currently re-parse most often (ideally a pptx + excel pair). Prepare interview answers up front (base URL, auth, version, audience, known gaps), run `llms-compose` through the new checkpoint flow, pass `pnpm docs-import check`. **Acceptance test:** a fresh agent session answers 3–5 real task questions from the served namespace alone. Failures point at the entry/description to fix.
-
-### Increment M5 — Scale with governance
-
-Before wide intranet exposure: set `WRITE_TOKEN`; establish namespace naming/tag conventions per team or system; assign an owner + review cadence per namespace (`.meta.json` trust fields exist since Phase 5); keep everything `draft` until reviewed. Curation quality over volume — ten reviewed namespaces beat fifty raw dumps.
+Detail lives in the domain slice it carries — **`.gravity/ingest/PLAN.intranet-mirror.md`** (Goal · Scenario · M3 real-host mirror → M4 first internal manual → M5 governance · Verification · Next). Shipped so far: M1 (`?resolve=local`), M2 (compose checkpoint + xlsx), M6 (clean `/docs/` URLs), M7 (reader + review UI). Track M's locked decisions moved into that PLAN slice's residue block.
 
 ### When Phase 8 (Search) triggers
 
@@ -696,10 +623,10 @@ For each phase:
 
 ## Immediate Next Step
 
-Track R is committed. **Track M is the active thread** and runs ahead of Phase 8:
+**Track M (intranet deployment) is the active thread** and runs ahead of Phase 8. Its slice detail lives in **`.gravity/ingest/PLAN.intranet-mirror.md`** — read that, not this list:
 
-1. **Track M3 — UC1 pilot** (active) — register a real external `llms.txt`, verify the `?resolve=local` mirror with the offline acceptance test.
-2. **Track M4 — UC2 pilot** (next) — compose the first real internal manual (pptx/excel) through the new checkpoint flow; fresh-agent acceptance test.
+1. **M3 — UC1 pilot** (active) — register a real external `llms.txt` on the intranet host, verify the `?resolve=local` mirror with the offline acceptance test from a second machine.
+2. **M4 — UC2 pilot** (next) — compose the first real internal manual (pptx/excel) through the checkpoint flow; fresh-agent acceptance test.
 3. **Phase 8 — Search** (queued) — starts when namespace selection from the manifest alone stops scaling.
 
-A fresh agent picking up here should read Track M, run M3, then M4. Read the Phase 8 section and inspect the existing routes before starting Search.
+A fresh agent picking up here should open `.gravity/ingest/PLAN.intranet-mirror.md`, run M3, then M4.

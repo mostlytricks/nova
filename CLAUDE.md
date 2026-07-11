@@ -97,7 +97,7 @@ No tests yet. Verify changes by running `pnpm typecheck` (covers both `tsconfig.
 - **`data/cache/` and `data/index.sqlite` are regenerable** — fine to delete during debugging. `data/own/` is the source of truth and should be git-tracked once you have content worth keeping.
 - **White page at `localhost:5173`** typically means a stale `node` is holding the port and Vite quietly bound to `5174`. README has the kill-port recipe.
 - **`.claude/` directory at the repo root** holds local Claude Code config — already covered by `.gitignore`.
-- **`.gravity/IMPLEMENTATION_PLAN.md`** is the 8-phase control-plane roadmap (Phases 1–7 **done**; Phase 8 = Search queued) plus **Track R** (ingestion router & CSR/SPA handling — complete locally, pending commit). Read before changing how docs are split across namespaces, touching the ingest path, or starting a new phase.
+- **`.gravity/IMPLEMENTATION_PLAN.md`** is the 8-phase control-plane roadmap plus a **Tracks** index (the direction axis): **Track R** (input hardening) is retired — its rules live in `ingest/SPEC.md` + `namespace/SPEC.md`; **Track M** (intranet deployment) is active, detailed in `.gravity/ingest/PLAN.intranet-mirror.md`. Read before changing how docs are split across namespaces, touching the ingest path, or starting a new phase.
 
 ## Entry Points
 
