@@ -1,4 +1,4 @@
-# local-llmstxt-server
+# nova
 
 Internal-network server that hosts your own `llms.txt` (with namespaced sub-manifests) and acts as a probe/cache/relay for external `llms.txt` sources. React UI for editing own content, probing new external sources, and managing source lifecycle (trial → active → archived).
 
@@ -44,7 +44,7 @@ Before touching a domain, load its `.gravity/<domain>/SPEC.md` — the compact a
 
 ## Adding a domain (start here for a new feature)
 
-A **domain** is a durable subject area an agent repeatedly navigates and changes — not every feature is one. Mint a `.gravity/<domain>/` folder only when the feature has its own *gravity* (its own principle + non-goal, rules worth a `SPEC.md`, a multi-step arc). If it fails that gate, it's a `PLAN.*.md` slice under an existing domain (`ingest`/`namespace`), not a new folder. When you do add one, **wire all four indexes so it's never orphaned**: this Doc Map, the router table above, a `.gravity/MISSION.html` "system in N domains" row, and the `.gravity/IMPLEMENTATION_PLAN.md` status spine. Start minimal — usually just `PLAN.md` day one; add `SPEC.md`/`ARCHITECTURE.html` as they earn it. `/new-domain local-llmstxt-server <domain>` does the wiring. (Workspace CLAUDE.md §6.)
+A **domain** is a durable subject area an agent repeatedly navigates and changes — not every feature is one. Mint a `.gravity/<domain>/` folder only when the feature has its own *gravity* (its own principle + non-goal, rules worth a `SPEC.md`, a multi-step arc). If it fails that gate, it's a `PLAN.*.md` slice under an existing domain (`ingest`/`namespace`), not a new folder. When you do add one, **wire all four indexes so it's never orphaned**: this Doc Map, the router table above, a `.gravity/MISSION.html` "system in N domains" row, and the `.gravity/IMPLEMENTATION_PLAN.md` status spine. Start minimal — usually just `PLAN.md` day one; add `SPEC.md`/`ARCHITECTURE.html` as they earn it. `/new-domain nova <domain>` does the wiring. (Workspace CLAUDE.md §6.)
 
 ## Stack
 
@@ -114,5 +114,5 @@ No tests yet. Verify changes by running `pnpm typecheck` (covers both `tsconfig.
 
 ## Git
 
-- Remote: `https://github.com/mostlytricks/local-llmstxt-server.git`
+- Remote: `https://github.com/mostlytricks/nova.git`
 - Default branch: `master` (not `main`).

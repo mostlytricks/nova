@@ -9,6 +9,9 @@ Versions are anchored by annotated git tags `vX.Y.Z` — the tag plus `package.j
 
 ## [Unreleased]
 
+### Changed
+- **Project renamed `local-llmstxt-server` → `nova`** (NOVA — *Namespace Orchestrator for Verified Agent-docs*; alias declared 2026-07-06, rename executed 2026-07-22). GitHub repo already lived at `mostlytricks/nova`; this lands the rest: `package.json` name, doc identities (CLAUDE/README/MISSION/ARCHITECTURE/IMPLEMENTATION_PLAN), changelog link refs, and the workspace folder + junction. Old GitHub URLs redirect. The `.codex/skills/local-llmstxt-server/` skill folder keeps its name deliberately — workplace Codex discovers it by that slug; rename it only in step with the astra registry.
+
 ## [0.1.0] - 2026-07-06
 
 First tagged release. Bundles the full 8-phase control plane, the ingestion
@@ -32,5 +35,5 @@ built to date.
 - **`llms-compose` skill** — compose a namespace from local material (pptx / xlsx / PDF / pasted text) via a metadata interview with a mandatory architecture checkpoint before any file is written.
 - **`.gravity/` doc system** — mission / architecture / plan plus `ingest` and `namespace` domain SPECs, with `CLAUDE.md` as the router. Project alias `nova`.
 
-[Unreleased]: https://github.com/mostlytricks/local-llmstxt-server/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/mostlytricks/local-llmstxt-server/releases/tag/v0.1.0
+[Unreleased]: https://github.com/mostlytricks/nova/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mostlytricks/nova/releases/tag/v0.1.0

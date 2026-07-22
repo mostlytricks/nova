@@ -1,6 +1,6 @@
 # Implementation Plan — agent-ready docs control plane
 
-> Scope: this file is the shared execution plan for agents working on `local-llmstxt-server`.
+> Scope: this file is the shared execution plan for agents working on `nova`.
 > Read `MISSION.html` first. The mission is durable; this plan is the phase roadmap.
 
 ## Per-domain status (`.gravity/<domain>/`)
@@ -23,7 +23,7 @@ The spine above says *where each domain is*; a **track** says *how far along eac
 
 ## Mission Fit
 
-`local-llmstxt-server` should become an intranet documentation control plane for coding agents: one trusted local place where humans curate local docs, internal API notes, and approved external `llms.txt` sources, then expose them as focused, namespaced manifests that agents can fetch selectively.
+`nova` should become an intranet documentation control plane for coding agents: one trusted local place where humans curate local docs, internal API notes, and approved external `llms.txt` sources, then expose them as focused, namespaced manifests that agents can fetch selectively.
 
 The active build strategy is staged:
 

@@ -1,8 +1,9 @@
-# CONTEXT — local-llmstxt-server (`nova`)
+# CONTEXT — nova
 
-Last touched: 2026-07-11
+Last touched: 2026-07-22
 
 ## Completed
+- **Rename executed: `local-llmstxt-server` → `nova`** (2026-07-22, workspace-side). package.json + all doc identities + changelog links; repos/ folder + tier junction + PROJECTS.md rows renamed in the workspace. GitHub repo was already `mostlytricks/nova`; old URLs redirect. `.codex/skills/local-llmstxt-server/` slug kept (Codex/astra discovery name).
 - **Gravity v1.8 sync + Tracks formalized** (2026-07-11). Synced to gravity v1.8 — added `.gravity/GRAVITY.md` protocol card, bumped stamp v1.0→v1.8 (committed `61028a3`, pushed). Then formalized the hand-rolled Track R/M into the canonical v1.8 **Tracks index** in `IMPLEMENTATION_PLAN.md`: **Track R** (input hardening) retired → residue in `ingest/SPEC.md` + `namespace/SPEC.md`; **Track M** (intranet deployment) active, detail moved down into new `.gravity/ingest/PLAN.intranet-mirror.md`.
 - **Phase 8 Search re-built** (2026-07-06). Shared core `server/search.ts` (case-insensitive AND-term ranking over own entries + namespace manifests + cached active-source metadata & body) feeding two callers: `GET /api/search?q=&limit=` (`server/routes/search.ts`) and `docs-import search <q> [--json] [--limit N]`. Source-page result URLs reuse `routes/docs.ts` `sourcePageNames` so they match `/docs/` serving. Verified end-to-end: typecheck clean, CLI + API return ranked results, top result URL served 200. (Replaces the impl lost in the pull.)
 - **`nova` alias + gravity housekeeping** (2026-07-06). Declared `> alias: nova` (*Namespace Orchestrator for Verified Agent-docs*) in `CLAUDE.md`; restored the `> gravity: v1.0` stamp the pull had dropped; gave `ingest/SPEC.md` and `namespace/SPEC.md` explicit `**Gate:**` lines. Track M6 + M7 (clean `/docs/` URLs, reader + review UI) had merged to `master` via PRs #1-#2.

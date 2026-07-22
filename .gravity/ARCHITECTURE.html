@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  ARCHITECTURE.html - operator and agent architecture guide for local-llmstxt-server.
+  ARCHITECTURE.html - operator and agent architecture guide for nova.
   This explains how the system is used end to end: collect, compose, validate, serve, consume.
   Mission and principles live in MISSION.html. Roadmap lives in IMPLEMENTATION_PLAN.md.
 -->
@@ -8,7 +8,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>local-llmstxt-server - Architecture</title>
+<title>nova - Architecture</title>
 <style>
   :root {
     --bg:#0A0E1A; --panel:rgba(17,24,43,0.72); --panel-2:rgba(26,36,64,0.82); --line:rgba(255,255,255,0.09);
@@ -192,7 +192,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo"><span class="sq"></span><span class="k">local-llmstxt-server</span></div>
+    <div class="logo"><span class="sq"></span><span class="k">nova</span></div>
     <h1>Architecture</h1>
     <p class="lede">This system turns scattered documentation into curated, validated, locally served <code>llms.txt</code> doc sets that coding agents can read selectively.</p>
     <div class="toc">
@@ -347,7 +347,7 @@ Do not fetch every link unless the task requires broad coverage.</pre>
   </div>
 
   <footer>
-    local-llmstxt-server - architecture guide. Mission: <code>MISSION.html</code>. Roadmap: <code>IMPLEMENTATION_PLAN.md</code>. Current state: <code>../CONTEXT.md</code>.
+    nova - architecture guide. Mission: <code>MISSION.html</code>. Roadmap: <code>IMPLEMENTATION_PLAN.md</code>. Current state: <code>../CONTEXT.md</code>.
   </footer>
 </div>
 <div class="themebar" id="themebar" role="group" aria-label="Theme"><button data-theme="aurora"><span class="sw" style="background:linear-gradient(135deg,#00F2FE,#F093FB)"></span>Aurora</button><button data-theme="daylight"><span class="sw" style="background:linear-gradient(135deg,#60A5FA,#A78BFA)"></span>Daylight</button><button data-theme="sandstone"><span class="sw" style="background:linear-gradient(135deg,#F59E0B,#C2410C)"></span>Sandstone</button><button data-theme="forest"><span class="sw" style="background:linear-gradient(135deg,#34D399,#A3E635)"></span>Forest</button><button data-theme="slate"><span class="sw" style="background:linear-gradient(135deg,#CBD5E1,#64748B)"></span>Slate</button></div>

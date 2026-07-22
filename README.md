@@ -1,4 +1,6 @@
-# local-llmstxt-server
+# nova
+
+*NOVA — Namespace Orchestrator for Verified Agent-docs; formerly `local-llmstxt-server`.*
 
 A small internal-network server that:
 
